@@ -1,0 +1,45 @@
+# Build outputs
+bin/
+obj/
+out/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ASP.NET Core
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Staging.json
+
+# Secrets (절대 커밋 금지)
+*.env
+.env
+secrets.json
+**/secrets/
+
+# User secrets
+%APPDATA%/Microsoft/UserSecrets/
+
+# NuGet
+*.nupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Docker
+docker-compose.override.yml
