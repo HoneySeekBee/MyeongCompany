@@ -9,38 +9,33 @@ public class IndexModel : PageModel
 {
     private readonly IProcessRepository _repo;
 
-    public IReadOnlyList<ProcessDefinition> Definitions { get; private set; } = [];
+    public IReadOnlyList<ProcessDefinition> ProcessDefinitions { get; private set; } = [];
+    public IReadOnlyList<ProductionResult>  ProductionResults  { get; private set; } = [];
 
-    /// <summary>공정별 금일 생산실적 집계 (ProcessCode → (Produced, Defect))</summary>
-    public IReadOnlyList<ProcessDailySummary> DailySummary { get; private set; } = [];
+    // 생산 실적 탭 요약
+    public decimal TodayProduced  { get; private set; }
+    public decimal TodayDefect    { get; private set; }
+    public decimal TodayDefectRate => TodayProduced == 0
+        ? 0m
+        : Math.Round(TodayDefect / TodayProduced * 100m, 1);
+
+    // 공정 정의 탭 요약
+    public int     TotalProcessCount        => ProcessDefinitions.Count;
+    public decimal AverageStandardTimeMinutes =>
+        ProcessDefinitions.Count == 0
+            ? 0m
+            : Math.Round(ProcessDefinitions.Average(d => d.StandardTimeMinutes), 1);
 
     public IndexModel(IProcessRepository repo) => _repo = repo;
 
     public async Task OnGetAsync(CancellationToken ct = default)
     {
-        Definitions = await _repo.ListProcessesAsync(ct);
+        ProcessDefinitions = await _repo.ListProcessesAsync(ct);
 
         var today = DateTime.UtcNow.Date;
-        var results = await _repo.ListResultsAsync(today, today.AddDays(1), ct);
+        ProductionResults = await _repo.ListResultsAsync(today, today.AddDays(1), ct);
 
-        DailySummary = results
-            .GroupBy(r => r.ProcessCode)
-            .Select(g => new ProcessDailySummary(
-                g.Key,
-                Definitions.FirstOrDefault(d => d.ProcessCode == g.Key)?.ProcessName ?? g.Key,
-                g.Sum(r => r.ProducedQuantity),
-                g.Sum(r => r.DefectQuantity)))
-            .OrderBy(s => s.ProcessCode)
-            .ToList();
+        TodayProduced = ProductionResults.Sum(r => r.ProducedQuantity);
+        TodayDefect   = ProductionResults.Sum(r => r.DefectQuantity);
     }
-}
-
-public sealed record ProcessDailySummary(
-    string ProcessCode,
-    string ProcessName,
-    decimal Produced,
-    decimal Defect)
-{
-    public decimal DefectRate => Produced == 0 ? 0 : Math.Round(Defect / Produced * 100m, 1);
-    public decimal AchievementRate => Produced == 0 ? 0 : Math.Min(100m, Math.Round(Produced / (Produced + Defect) * 100m, 1));
 }

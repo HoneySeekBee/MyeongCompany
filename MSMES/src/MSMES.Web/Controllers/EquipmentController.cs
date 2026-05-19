@@ -36,6 +36,32 @@ public class EquipmentController : ControllerBase
         return Ok(list);
     }
 
+    /// <summary>설비 등록</summary>
+    [HttpPost]
+    public async Task<IActionResult> Create(
+        [FromBody] CreateEquipmentRequest req,
+        CancellationToken ct = default)
+    {
+        var existing = await _repo.GetByCodeAsync(req.EquipmentCode, ct);
+        if (existing is not null)
+            return Conflict(new { message = $"이미 존재하는 설비코드입니다: {req.EquipmentCode}" });
+
+        var equipment = new Domain.Equipment.Equipment
+        {
+            EquipmentCode      = req.EquipmentCode,
+            EquipmentName      = req.EquipmentName,
+            EquipmentType      = req.EquipmentType ?? string.Empty,
+            Location           = req.Location ?? string.Empty,
+            Status             = req.Status,
+            LastInspectionDate = req.LastInspectionDate,
+            NextInspectionDate = req.NextInspectionDate,
+            CreatedAt          = DateTime.UtcNow,
+            CreatedBy          = User.Identity?.Name ?? "system"
+        };
+        await _repo.AddAsync(equipment, ct);
+        return CreatedAtAction(nameof(List), new { }, new { equipmentCode = equipment.EquipmentCode });
+    }
+
     /// <summary>점검 예정일 7일 이내 설비 목록</summary>
     [HttpGet("maintenance-due")]
     public async Task<IActionResult> MaintenanceDue(CancellationToken ct = default)
@@ -73,3 +99,12 @@ public class EquipmentController : ControllerBase
 }
 
 public sealed record UpdateEquipmentStatusRequest(EquipmentStatus Status);
+
+public sealed record CreateEquipmentRequest(
+    string EquipmentCode,
+    string EquipmentName,
+    string? EquipmentType,
+    string? Location,
+    EquipmentStatus Status,
+    DateTime? LastInspectionDate,
+    DateTime? NextInspectionDate);

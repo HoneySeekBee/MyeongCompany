@@ -2,98 +2,501 @@
 @model MSMES.Web.Pages.Equipment.IndexModel
 @{ ViewData["Title"] = "설비관리"; }
 
-<style>
-    .kpi-cards { display: flex; gap: 16px; margin-bottom: 24px; }
-    .kpi-card  { flex: 1; background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center; }
-    .kpi-card .value { font-size: 2rem; font-weight: 700; }
-    .kpi-card .label { color: #666; font-size: 0.85rem; margin-top: 4px; }
-    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
-    .badge-running     { background: #d4edda; color: #155724; }
-    .badge-stopped     { background: #e2e3e5; color: #383d41; }
-    .badge-maintenance { background: #fff3cd; color: #856404; }
-    .badge-breakdown   { background: #f8d7da; color: #721c24; }
-    .alert-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin-bottom: 24px; border-radius: 4px; }
-</style>
-
-<h1>설비관리</h1>
-
-<!-- KPI 카드 -->
-<div class="kpi-cards">
-    <div class="kpi-card">
-        <div class="value" style="color:#27ae60;">@Model.RunningCount</div>
-        <div class="label">가동중</div>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-wrench-adjustable me-2 text-primary-ms"></i>설비관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active" aria-current="page">설비관리</li>
+            </ol>
+        </nav>
     </div>
-    <div class="kpi-card">
-        <div class="value" style="color:#f39c12;">@Model.MaintenanceCount</div>
-        <div class="label">점검중</div>
+    <button type="button" class="btn btn-primary"
+            data-bs-toggle="modal" data-bs-target="#modalEquipment"
+            onclick="openCreateEquipmentModal()">
+        <i class="bi bi-plus-lg me-1"></i>설비 등록
+    </button>
+</div>
+
+<!-- KPI 카드 3개 -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-4">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">가동중 설비 <i class="bi bi-activity"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-success);">@Model.RunningCount</div>
+            <div class="kpi-card__sub">현재 정상 가동</div>
+        </div>
     </div>
-    <div class="kpi-card">
-        <div class="value" style="color:#e74c3c;">@Model.BreakdownCount</div>
-        <div class="label">고장</div>
+    <div class="col-6 col-md-4">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">점검중 / 고장 <i class="bi bi-tools"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-warning);">@(Model.MaintenanceCount + Model.BreakdownCount)</div>
+            <div class="kpi-card__sub">점검중 @Model.MaintenanceCount · 고장 @Model.BreakdownCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4">
+        <div class="kpi-card kpi-info">
+            <div class="kpi-card__label">이번 주 점검 예정 <i class="bi bi-calendar-check"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-info);">@Model.MaintenanceDueCount</div>
+            <div class="kpi-card__sub">7일 이내 점검 예정 설비</div>
+        </div>
     </div>
 </div>
 
 <!-- 점검 예정 알림 -->
 @if (Model.MaintenanceDue.Any())
 {
-    <div class="alert-box">
-        <strong>점검 예정 알림</strong> — 7일 이내 점검 예정 설비 @Model.MaintenanceDue.Count 건
-        <ul style="margin:8px 0 0; padding-left:20px;">
-            @foreach (var eq in Model.MaintenanceDue)
-            {
-                <li>
-                    <strong>@eq.EquipmentCode</strong> @eq.EquipmentName
-                    — 다음 점검일: @eq.NextInspectionDate?.ToString("yyyy-MM-dd")
-                </li>
-            }
-        </ul>
+    <div class="alert alert-warning d-flex gap-2 align-items-start mb-3" role="alert">
+        <i class="bi bi-exclamation-triangle-fill flex-shrink-0 mt-1"></i>
+        <div>
+            <strong>점검 예정 알림</strong> — 7일 이내 점검 예정 설비 @Model.MaintenanceDue.Count 건
+            <ul class="mb-0 mt-1" style="padding-left:18px;">
+                @foreach (var eq in Model.MaintenanceDue)
+                {
+                    <li>
+                        <strong>@eq.EquipmentCode</strong> @eq.EquipmentName
+                        — 다음 점검일: @eq.NextInspectionDate?.ToString("yyyy-MM-dd")
+                    </li>
+                }
+            </ul>
+        </div>
     </div>
 }
 
-<!-- 설비 목록 -->
-<h2 style="margin-top:0;">설비 목록</h2>
-<table>
-    <thead>
-        <tr>
-            <th>설비코드</th>
-            <th>설비명</th>
-            <th>유형</th>
-            <th>위치</th>
-            <th>상태</th>
-            <th>마지막 점검일</th>
-            <th>다음 점검일</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var eq in Model.Equipments)
-        {
-            var badgeCss = eq.Status switch
-            {
-                MSMES.Domain.Equipment.EquipmentStatus.Running     => "badge-running",
-                MSMES.Domain.Equipment.EquipmentStatus.Maintenance => "badge-maintenance",
-                MSMES.Domain.Equipment.EquipmentStatus.Breakdown   => "badge-breakdown",
-                _                                                   => "badge-stopped"
-            };
-            var statusLabel = eq.Status switch
-            {
-                MSMES.Domain.Equipment.EquipmentStatus.Running     => "가동중",
-                MSMES.Domain.Equipment.EquipmentStatus.Maintenance => "점검중",
-                MSMES.Domain.Equipment.EquipmentStatus.Breakdown   => "고장",
-                _                                                   => "정지"
-            };
-            <tr>
-                <td>@eq.EquipmentCode</td>
-                <td>@eq.EquipmentName</td>
-                <td>@eq.EquipmentType</td>
-                <td>@eq.Location</td>
-                <td><span class="badge @badgeCss">@statusLabel</span></td>
-                <td>@eq.LastInspectionDate?.ToString("yyyy-MM-dd")</td>
-                <td>@eq.NextInspectionDate?.ToString("yyyy-MM-dd")</td>
-            </tr>
-        }
-        @if (!Model.Equipments.Any())
-        {
-            <tr><td colspan="7">등록된 설비가 없습니다.</td></tr>
-        }
-    </tbody>
-</table>
+<!-- 검색 필터 -->
+<div class="ms-filter-card">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-6 col-md-2">
+            <label for="filterEqCode" class="form-label text-muted-sm mb-1">설비코드</label>
+            <input type="text" id="filterEqCode" class="form-control form-control-sm" placeholder="EQ-001" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <label for="filterEqName" class="form-label text-muted-sm mb-1">설비명</label>
+            <input type="text" id="filterEqName" class="form-control form-control-sm" placeholder="설비명 검색" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-2">
+            <label for="filterEqStatus" class="form-label text-muted-sm mb-1">상태</label>
+            <select id="filterEqStatus" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="0">가동중</option>
+                <option value="1">정지</option>
+                <option value="2">점검중</option>
+                <option value="3">고장</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-2">
+            <label for="filterEqLocation" class="form-label text-muted-sm mb-1">위치</label>
+            <input type="text" id="filterEqLocation" class="form-control form-control-sm" placeholder="공장 A" />
+        </div>
+        <div class="col-12 col-sm-auto d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-primary" onclick="filterEquipments()">
+                <i class="bi bi-search me-1"></i>검색
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearEqFilter()">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 설비 목록 테이블 -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <h2 class="ms-card__title">설비 목록</h2>
+        <span class="text-muted-sm">총 <strong id="eqCount">@Model.Equipments.Count</strong>건</span>
+    </div>
+    <div class="ms-card__body p-0">
+        <div class="mes-table-wrapper">
+            <table class="mes-table" id="tblEquipments" aria-label="설비 목록 테이블">
+                <thead>
+                    <tr>
+                        <th scope="col">설비코드</th>
+                        <th scope="col">설비명</th>
+                        <th scope="col">설비유형</th>
+                        <th scope="col">위치</th>
+                        <th scope="col">상태</th>
+                        <th scope="col">마지막점검일</th>
+                        <th scope="col">다음점검예정일</th>
+                        <th scope="col" style="width:120px;">액션</th>
+                    </tr>
+                </thead>
+                <tbody id="tbodyEquipments">
+                @{
+                    var today7 = DateTime.Today.AddDays(7);
+                }
+                @if (!Model.Equipments.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted-sm">
+                            <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4;"></i>
+                            등록된 설비가 없습니다.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var eq in Model.Equipments)
+                    {
+                        var (badgeCss, statusLabel, statusVal) = eq.Status switch
+                        {
+                            MSMES.Domain.Equipment.EquipmentStatus.Running     => ("status-badge-completed",    "가동중", "0"),
+                            MSMES.Domain.Equipment.EquipmentStatus.Maintenance => ("status-badge-inproduction", "점검중", "2"),
+                            MSMES.Domain.Equipment.EquipmentStatus.Breakdown   => ("status-badge-cancelled",    "고장",   "3"),
+                            _                                                   => ("status-badge-draft",        "정지",   "1")
+                        };
+                        var isDue = eq.NextInspectionDate.HasValue && eq.NextInspectionDate.Value.Date <= today7;
+                        var rowStyle = isDue ? "background-color: #fffbe6;" : "";
+                        <tr data-code="@eq.EquipmentCode"
+                            data-name="@eq.EquipmentName"
+                            data-status="@statusVal"
+                            data-location="@eq.Location"
+                            style="@rowStyle">
+                            <td>@eq.EquipmentCode</td>
+                            <td>@eq.EquipmentName</td>
+                            <td>@eq.EquipmentType</td>
+                            <td>@eq.Location</td>
+                            <td><span class="ms-badge @badgeCss">@statusLabel</span></td>
+                            <td>@(eq.LastInspectionDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <td>
+                                @if (isDue && eq.NextInspectionDate.HasValue)
+                                {
+                                    <span class="fw-600 text-warning">
+                                        <i class="bi bi-exclamation-circle me-1"></i>@eq.NextInspectionDate.Value.ToString("yyyy-MM-dd")
+                                    </span>
+                                }
+                                else
+                                {
+                                    @(eq.NextInspectionDate?.ToString("yyyy-MM-dd") ?? "-")
+                                }
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn-icon"
+                                            title="상태변경"
+                                            data-bs-toggle="modal" data-bs-target="#modalStatus"
+                                            onclick="openStatusModal('@eq.EquipmentCode','@eq.EquipmentName',@((int)eq.Status))"
+                                            aria-label="상태변경">
+                                        <i class="bi bi-arrow-repeat"></i>
+                                    </button>
+                                    <button type="button" class="btn-icon"
+                                            title="점검등록"
+                                            data-bs-toggle="modal" data-bs-target="#modalMaintenance"
+                                            onclick="openMaintenanceModal('@eq.EquipmentCode','@eq.EquipmentName')"
+                                            aria-label="점검등록">
+                                        <i class="bi bi-tools"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════
+     설비 등록 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalEquipment" tabindex="-1"
+     aria-labelledby="modalEquipmentLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalEquipmentLabel">
+                    <i class="bi bi-wrench-adjustable me-2"></i>설비 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formEquipment" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="eqCode" class="form-label">설비코드 <span class="text-danger">*</span></label>
+                            <input type="text" id="eqCode" class="form-control" placeholder="EQ-001" required />
+                            <div class="invalid-feedback">설비코드는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eqName" class="form-label">설비명 <span class="text-danger">*</span></label>
+                            <input type="text" id="eqName" class="form-control" placeholder="CNC 선반 #1" required />
+                            <div class="invalid-feedback">설비명은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="eqType" class="form-label">설비유형</label>
+                            <input type="text" id="eqType" class="form-control" placeholder="예: CNC선반" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="eqLocation" class="form-label">위치</label>
+                            <input type="text" id="eqLocation" class="form-control" placeholder="공장 A" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="eqStatus" class="form-label">상태</label>
+                            <select id="eqStatus" class="form-select">
+                                <option value="0">가동중</option>
+                                <option value="1" selected>정지</option>
+                                <option value="2">점검중</option>
+                                <option value="3">고장</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eqLastInspection" class="form-label">마지막점검일</label>
+                            <input type="date" id="eqLastInspection" class="form-control" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="eqNextInspection" class="form-label">다음점검예정일</label>
+                            <input type="date" id="eqNextInspection" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary" data-save>
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     상태변경 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalStatus" tabindex="-1"
+     aria-labelledby="modalStatusLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalStatusLabel">
+                    <i class="bi bi-arrow-repeat me-2"></i>상태변경
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="statusEqCode" />
+                <p class="mb-2 fw-600" id="statusEqName"></p>
+                <label for="newStatus" class="form-label">변경할 상태</label>
+                <select id="newStatus" class="form-select">
+                    <option value="0">가동중 (Running)</option>
+                    <option value="1">정지 (Stopped)</option>
+                    <option value="2">점검중 (Maintenance)</option>
+                    <option value="3">고장 (Breakdown)</option>
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" data-save onclick="saveStatus()">
+                    <i class="bi bi-check-lg me-1"></i>변경
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     점검 등록 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalMaintenance" tabindex="-1"
+     aria-labelledby="modalMaintenanceLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalMaintenanceLabel">
+                    <i class="bi bi-tools me-2"></i>점검 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formMaintenance" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <input type="hidden" id="maintEqCode" />
+                    <p class="mb-3 fw-600" id="maintEqName"></p>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label for="maintType" class="form-label">점검유형 <span class="text-danger">*</span></label>
+                            <select id="maintType" class="form-select" required>
+                                <option value="">-- 선택 --</option>
+                                <option value="정기점검">정기점검</option>
+                                <option value="긴급점검">긴급점검</option>
+                                <option value="예방점검">예방점검</option>
+                            </select>
+                            <div class="invalid-feedback">점검유형을 선택하세요.</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="maintDesc" class="form-label">점검내용 <span class="text-danger">*</span></label>
+                            <textarea id="maintDesc" class="form-control" rows="3"
+                                      placeholder="점검 내용을 입력하세요" required></textarea>
+                            <div class="invalid-feedback">점검내용은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="maintOperator" class="form-label">점검자 <span class="text-danger">*</span></label>
+                            <input type="text" id="maintOperator" class="form-control"
+                                   placeholder="점검자 이름" required />
+                            <div class="invalid-feedback">점검자는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="maintNextDue" class="form-label">다음점검예정일</label>
+                            <input type="date" id="maintNextDue" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary" data-save>
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// ── 설비 목록 필터링 ────────────────────────────────
+function filterEquipments() {
+    var code     = document.getElementById('filterEqCode').value.trim().toLowerCase();
+    var name     = document.getElementById('filterEqName').value.trim().toLowerCase();
+    var status   = document.getElementById('filterEqStatus').value;
+    var location = document.getElementById('filterEqLocation').value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#tbodyEquipments tr[data-code]');
+    var visible = 0;
+    rows.forEach(function(row) {
+        var rCode     = (row.dataset.code     || '').toLowerCase();
+        var rName     = (row.dataset.name     || '').toLowerCase();
+        var rStatus   = (row.dataset.status   || '');
+        var rLocation = (row.dataset.location || '').toLowerCase();
+        var show = (!code     || rCode.includes(code))
+                && (!name     || rName.includes(name))
+                && (!status   || rStatus === status)
+                && (!location || rLocation.includes(location));
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('eqCount').textContent = visible;
+}
+function clearEqFilter() {
+    document.getElementById('filterEqCode').value     = '';
+    document.getElementById('filterEqName').value     = '';
+    document.getElementById('filterEqStatus').value   = '';
+    document.getElementById('filterEqLocation').value = '';
+    filterEquipments();
+}
+
+// ── 설비 등록 모달 열기 ──────────────────────────────
+function openCreateEquipmentModal() {
+    document.getElementById('formEquipment').reset();
+    document.getElementById('formEquipment').classList.remove('was-validated');
+}
+
+// ── 설비 등록 폼 저장 ────────────────────────────────
+document.getElementById('formEquipment').addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        var f = this.querySelector(':invalid');
+        if (f) f.focus();
+        return;
+    }
+    var lastInspVal = document.getElementById('eqLastInspection').value;
+    var nextInspVal = document.getElementById('eqNextInspection').value;
+    var data = {
+        equipmentCode:      document.getElementById('eqCode').value,
+        equipmentName:      document.getElementById('eqName').value,
+        equipmentType:      document.getElementById('eqType').value,
+        location:           document.getElementById('eqLocation').value,
+        status:             parseInt(document.getElementById('eqStatus').value, 10),
+        lastInspectionDate: lastInspVal ? new Date(lastInspVal).toISOString() : null,
+        nextInspectionDate: nextInspVal ? new Date(nextInspVal).toISOString() : null
+    };
+    msFetch('/api/equipment', { method: 'POST', body: JSON.stringify(data) })
+        .then(function(res) {
+            if (res.ok || res.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('modalEquipment')).hide();
+                showToast('설비가 등록되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('등록 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('등록 실패: 네트워크 오류', 'danger'); });
+});
+
+// ── 상태변경 모달 열기 ──────────────────────────────
+function openStatusModal(code, name, currentStatus) {
+    document.getElementById('statusEqCode').value      = code;
+    document.getElementById('statusEqName').textContent = name;
+    document.getElementById('newStatus').value         = String(currentStatus);
+}
+
+// ── 상태변경 저장 ────────────────────────────────────
+function saveStatus() {
+    var code   = document.getElementById('statusEqCode').value;
+    var status = parseInt(document.getElementById('newStatus').value, 10);
+    msFetch('/api/equipment/' + encodeURIComponent(code) + '/status',
+        { method: 'PATCH', body: JSON.stringify({ status: status }) })
+        .then(function(res) {
+            if (res.ok) {
+                bootstrap.Modal.getInstance(document.getElementById('modalStatus')).hide();
+                showToast('상태가 변경되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1000);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('변경 실패: ' + (err.message || '서버 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('변경 실패: 네트워크 오류', 'danger'); });
+}
+
+// ── 점검 등록 모달 열기 ──────────────────────────────
+function openMaintenanceModal(code, name) {
+    document.getElementById('maintEqCode').value        = code;
+    document.getElementById('maintEqName').textContent  = name;
+    document.getElementById('formMaintenance').reset();
+    document.getElementById('formMaintenance').classList.remove('was-validated');
+}
+
+// ── 점검 등록 폼 저장 ────────────────────────────────
+document.getElementById('formMaintenance').addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        var f = this.querySelector(':invalid');
+        if (f) f.focus();
+        return;
+    }
+    var code       = document.getElementById('maintEqCode').value;
+    var nextDueVal = document.getElementById('maintNextDue').value;
+    var data = {
+        equipmentCode:   code,
+        maintenanceType: document.getElementById('maintType').value,
+        description:     document.getElementById('maintDesc').value,
+        operator:        document.getElementById('maintOperator').value,
+        nextDueDate:     nextDueVal ? new Date(nextDueVal).toISOString() : null,
+        createdBy:       ''
+    };
+    msFetch('/api/equipment/' + encodeURIComponent(code) + '/maintenance',
+        { method: 'POST', body: JSON.stringify(data) })
+        .then(function(res) {
+            if (res.ok || res.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('modalMaintenance')).hide();
+                showToast('점검이 등록되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('점검 등록 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('점검 등록 실패: 네트워크 오류', 'danger'); });
+});
+</script>
+}

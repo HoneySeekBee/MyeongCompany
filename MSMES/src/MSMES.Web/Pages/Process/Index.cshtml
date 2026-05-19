@@ -2,82 +2,579 @@
 @model MSMES.Web.Pages.Process.IndexModel
 @{ ViewData["Title"] = "공정관리"; }
 
-<style>
-    .progress-bar-wrap { background: #e9ecef; border-radius: 4px; height: 14px; width: 200px; display: inline-block; vertical-align: middle; }
-    .progress-bar-fill { height: 100%; border-radius: 4px; background: #3498db; }
-    .progress-bar-fill.good  { background: #27ae60; }
-    .progress-bar-fill.warn  { background: #f39c12; }
-    .progress-bar-fill.bad   { background: #e74c3c; }
-</style>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-diagram-3 me-2 text-primary-ms"></i>공정관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active" aria-current="page">공정관리</li>
+            </ol>
+        </nav>
+    </div>
+</div>
 
-<h1>공정관리</h1>
+<!-- 탭 네비게이션 -->
+<ul class="nav nav-tabs mb-3" id="processTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-definitions" data-bs-toggle="tab"
+                data-bs-target="#pane-definitions" type="button" role="tab"
+                aria-controls="pane-definitions" aria-selected="true">
+            <i class="bi bi-list-check me-1"></i>공정 정의
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-results" data-bs-toggle="tab"
+                data-bs-target="#pane-results" type="button" role="tab"
+                aria-controls="pane-results" aria-selected="false">
+            <i class="bi bi-bar-chart-line me-1"></i>생산 실적
+        </button>
+    </li>
+</ul>
 
-<!-- 공정 정의 -->
-<h2>공정 정의</h2>
-<table style="margin-bottom:32px;">
-    <thead>
-        <tr>
-            <th>공정코드</th>
-            <th>공정명</th>
-            <th>순서</th>
-            <th>표준 작업시간(분)</th>
-            <th>설비유형</th>
-            <th>활성</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var d in Model.Definitions)
-        {
-            <tr>
-                <td>@d.ProcessCode</td>
-                <td>@d.ProcessName</td>
-                <td>@d.ProcessOrder</td>
-                <td>@d.StandardTimeMinutes</td>
-                <td>@d.EquipmentType</td>
-                <td>@(d.IsActive ? "✔" : "✘")</td>
-            </tr>
-        }
-        @if (!Model.Definitions.Any())
-        {
-            <tr><td colspan="6">공정 정의가 없습니다.</td></tr>
-        }
-    </tbody>
-</table>
+<div class="tab-content" id="processTabContent">
 
-<!-- 금일 생산실적 -->
-<h2>금일(@DateTime.Today.ToString("yyyy-MM-dd")) 공정별 생산실적</h2>
-<table>
-    <thead>
-        <tr>
-            <th>공정코드</th>
-            <th>공정명</th>
-            <th>생산수량</th>
-            <th>불량수량</th>
-            <th>불량률(%)</th>
-            <th>달성률</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var s in Model.DailySummary)
-        {
-            var fillCss = s.AchievementRate >= 90 ? "good" : s.AchievementRate >= 70 ? "warn" : "bad";
-            <tr>
-                <td>@s.ProcessCode</td>
-                <td>@s.ProcessName</td>
-                <td>@s.Produced.ToString("N0")</td>
-                <td>@s.Defect.ToString("N0")</td>
-                <td>@s.DefectRate %</td>
-                <td>
-                    <div class="progress-bar-wrap">
-                        <div class="progress-bar-fill @fillCss" style="width:@s.AchievementRate%;"></div>
+    <!-- ══════════════════════════════
+         탭1: 공정 정의
+    ══════════════════════════════ -->
+    <div class="tab-pane fade show active" id="pane-definitions" role="tabpanel" aria-labelledby="tab-definitions">
+
+        <!-- KPI 카드 -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="kpi-card kpi-primary">
+                    <div class="kpi-card__label">전체 공정 수 <i class="bi bi-diagram-3"></i></div>
+                    <div class="kpi-card__value text-primary-ms">@Model.TotalProcessCount</div>
+                    <div class="kpi-card__sub">활성 공정 기준</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kpi-card kpi-info">
+                    <div class="kpi-card__label">평균 표준시간(분) <i class="bi bi-clock"></i></div>
+                    <div class="kpi-card__value" style="color:var(--ms-info);">@Model.AverageStandardTimeMinutes</div>
+                    <div class="kpi-card__sub">공정별 평균</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 검색 + 등록 버튼 -->
+        <div class="ms-filter-card d-flex align-items-end justify-content-between gap-2 flex-wrap">
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                    <label class="form-label text-muted-sm mb-1">공정코드</label>
+                    <input type="text" id="defFilterCode" class="form-control form-control-sm" placeholder="P-001" />
+                </div>
+                <div>
+                    <label class="form-label text-muted-sm mb-1">공정명</label>
+                    <input type="text" id="defFilterName" class="form-control form-control-sm" placeholder="공정명 검색" />
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="filterDefinitions()">
+                    <i class="bi bi-search me-1"></i>검색
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearDefFilter()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+                </button>
+            </div>
+            <button type="button" class="btn btn-primary"
+                    data-bs-toggle="modal" data-bs-target="#modalProcess"
+                    onclick="openCreateProcessModal()">
+                <i class="bi bi-plus-lg me-1"></i>공정 등록
+            </button>
+        </div>
+
+        <!-- 공정 정의 테이블 -->
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <h2 class="ms-card__title">공정 목록</h2>
+                <span class="text-muted-sm">총 <strong id="defCount">@Model.ProcessDefinitions.Count</strong>건</span>
+            </div>
+            <div class="ms-card__body p-0">
+                <div class="mes-table-wrapper">
+                    <table class="mes-table" id="tblDefinitions" aria-label="공정 정의 테이블">
+                        <thead>
+                            <tr>
+                                <th scope="col">공정코드</th>
+                                <th scope="col">공정명</th>
+                                <th scope="col">공정순서</th>
+                                <th scope="col">표준시간(분)</th>
+                                <th scope="col">설비유형</th>
+                                <th scope="col">등록일</th>
+                                <th scope="col" style="width:90px;">액션</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyDefinitions">
+                        @if (!Model.ProcessDefinitions.Any())
+                        {
+                            <tr id="defEmptyRow">
+                                <td colspan="7" class="text-center py-4 text-muted-sm">
+                                    <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4;"></i>
+                                    등록된 공정이 없습니다.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var d in Model.ProcessDefinitions)
+                            {
+                                <tr data-code="@d.ProcessCode" data-name="@d.ProcessName">
+                                    <td>@d.ProcessCode</td>
+                                    <td>@d.ProcessName</td>
+                                    <td>@d.ProcessOrder</td>
+                                    <td>@d.StandardTimeMinutes</td>
+                                    <td>@d.EquipmentType</td>
+                                    <td>@d.CreatedAt.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            <button type="button" class="btn-icon"
+                                                    onclick="openEditProcessModal('@d.ProcessCode','@d.ProcessName',@d.ProcessOrder,@d.StandardTimeMinutes,'@d.EquipmentType')"
+                                                    aria-label="수정" title="수정">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button type="button" class="btn-icon btn-icon-danger"
+                                                    onclick="deleteProcess('@d.ProcessCode','@d.ProcessName')"
+                                                    aria-label="삭제" title="삭제">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /pane-definitions -->
+
+    <!-- ══════════════════════════════
+         탭2: 생산 실적
+    ══════════════════════════════ -->
+    <div class="tab-pane fade" id="pane-results" role="tabpanel" aria-labelledby="tab-results">
+
+        <!-- KPI 카드 -->
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-3">
+                <div class="kpi-card kpi-success">
+                    <div class="kpi-card__label">금일 총 생산수량 <i class="bi bi-boxes"></i></div>
+                    <div class="kpi-card__value" style="color:var(--ms-success);">@Model.TodayProduced.ToString("N0")</div>
+                    <div class="kpi-card__sub">@DateTime.Today.ToString("yyyy-MM-dd") 기준</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kpi-card kpi-danger">
+                    <div class="kpi-card__label">금일 불량수량 <i class="bi bi-exclamation-triangle"></i></div>
+                    <div class="kpi-card__value" style="color:var(--ms-danger);">@Model.TodayDefect.ToString("N0")</div>
+                    <div class="kpi-card__sub">불량 발생 건수</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="kpi-card kpi-warning">
+                    <div class="kpi-card__label">금일 불량률(%) <i class="bi bi-percent"></i></div>
+                    <div class="kpi-card__value" style="color:var(--ms-warning);">@Model.TodayDefectRate</div>
+                    <div class="kpi-card__sub">불량수 / 생산수 × 100</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 검색 + 등록 버튼 -->
+        <div class="ms-filter-card d-flex align-items-end justify-content-between gap-2 flex-wrap">
+            <div class="d-flex gap-2 align-items-end flex-wrap">
+                <div>
+                    <label class="form-label text-muted-sm mb-1">작업지시번호</label>
+                    <input type="text" id="resFilterWorkOrder" class="form-control form-control-sm" placeholder="WO-2026-..." />
+                </div>
+                <div>
+                    <label class="form-label text-muted-sm mb-1">공정코드</label>
+                    <input type="text" id="resFilterProcess" class="form-control form-control-sm" placeholder="P-001" />
+                </div>
+                <div>
+                    <label class="form-label text-muted-sm mb-1">시작일 From</label>
+                    <input type="date" id="resFilterDateFrom" class="form-control form-control-sm" />
+                </div>
+                <div>
+                    <label class="form-label text-muted-sm mb-1">시작일 To</label>
+                    <input type="date" id="resFilterDateTo" class="form-control form-control-sm" />
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="filterResults()">
+                    <i class="bi bi-search me-1"></i>검색
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearResFilter()">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+                </button>
+            </div>
+            <button type="button" class="btn btn-primary"
+                    data-bs-toggle="modal" data-bs-target="#modalResult"
+                    onclick="openCreateResultModal()">
+                <i class="bi bi-plus-lg me-1"></i>실적 등록
+            </button>
+        </div>
+
+        <!-- 생산 실적 테이블 -->
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <h2 class="ms-card__title">생산 실적 목록</h2>
+                <span class="text-muted-sm">총 <strong id="resCount">@Model.ProductionResults.Count</strong>건</span>
+            </div>
+            <div class="ms-card__body p-0">
+                <div class="mes-table-wrapper">
+                    <table class="mes-table" id="tblResults" aria-label="생산 실적 테이블">
+                        <thead>
+                            <tr>
+                                <th scope="col">실적번호</th>
+                                <th scope="col">작업지시번호</th>
+                                <th scope="col">공정명</th>
+                                <th scope="col">작업자</th>
+                                <th scope="col">생산수량</th>
+                                <th scope="col">불량수량</th>
+                                <th scope="col">불량률(%)</th>
+                                <th scope="col">시작시간</th>
+                                <th scope="col">종료시간</th>
+                                <th scope="col">작업시간(분)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyResults">
+                        @if (!Model.ProductionResults.Any())
+                        {
+                            <tr id="resEmptyRow">
+                                <td colspan="10" class="text-center py-4 text-muted-sm">
+                                    <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4;"></i>
+                                    금일 생산 실적이 없습니다.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var r in Model.ProductionResults)
+                            {
+                                var processName = Model.ProcessDefinitions
+                                    .FirstOrDefault(d => d.ProcessCode == r.ProcessCode)?.ProcessName ?? r.ProcessCode;
+                                var defectRate = r.ProducedQuantity == 0 ? 0m
+                                    : Math.Round(r.DefectQuantity / r.ProducedQuantity * 100m, 1);
+                                <tr data-workorder="@r.WorkOrderNo" data-processcode="@r.ProcessCode"
+                                    data-starttime="@r.StartTime.ToString("yyyy-MM-dd")">
+                                    <td>@r.ResultNo</td>
+                                    <td>@r.WorkOrderNo</td>
+                                    <td>@processName</td>
+                                    <td>@r.Operator</td>
+                                    <td>@r.ProducedQuantity.ToString("N0")</td>
+                                    <td>@r.DefectQuantity.ToString("N0")</td>
+                                    <td>@defectRate %</td>
+                                    <td>@r.StartTime.ToLocalTime().ToString("MM-dd HH:mm")</td>
+                                    <td>@(r.EndTime.HasValue ? r.EndTime.Value.ToLocalTime().ToString("MM-dd HH:mm") : "-")</td>
+                                    <td>@(r.DurationMinutes.HasValue ? r.DurationMinutes.Value.ToString("N0") : "-")</td>
+                                </tr>
+                            }
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /pane-results -->
+
+</div><!-- /tab-content -->
+
+
+<!-- ══════════════════════════════════════════════════
+     공정 등록/수정 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalProcess" tabindex="-1"
+     aria-labelledby="modalProcessLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProcessLabel">
+                    <i class="bi bi-diagram-3 me-2"></i>
+                    <span id="modalProcessTitle">공정 등록</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formProcess" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <input type="hidden" id="procEditCode" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="procCode" class="form-label">공정코드 <span class="text-danger">*</span></label>
+                            <input type="text" id="procCode" class="form-control" placeholder="P-001" required />
+                            <div class="invalid-feedback">공정코드는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="procName" class="form-label">공정명 <span class="text-danger">*</span></label>
+                            <input type="text" id="procName" class="form-control" placeholder="예: 절삭가공" required />
+                            <div class="invalid-feedback">공정명은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="procOrder" class="form-label">공정순서 <span class="text-danger">*</span></label>
+                            <input type="number" id="procOrder" class="form-control" min="1" value="1" required />
+                            <div class="invalid-feedback">공정순서는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="procStdTime" class="form-label">표준시간(분) <span class="text-danger">*</span></label>
+                            <input type="number" id="procStdTime" class="form-control" min="0" step="0.1" value="0" required />
+                            <div class="invalid-feedback">표준시간은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="procEqType" class="form-label">설비유형</label>
+                            <input type="text" id="procEqType" class="form-control" placeholder="예: CNC선반" />
+                        </div>
                     </div>
-                    <span style="margin-left:8px;">@s.AchievementRate %</span>
-                </td>
-            </tr>
-        }
-        @if (!Model.DailySummary.Any())
-        {
-            <tr><td colspan="6">금일 생산실적이 없습니다.</td></tr>
-        }
-    </tbody>
-</table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary" data-save>
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     생산 실적 등록 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalResult" tabindex="-1"
+     aria-labelledby="modalResultLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalResultLabel">
+                    <i class="bi bi-bar-chart-line me-2"></i>실적 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formResult" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="resWorkOrder" class="form-label">작업지시번호 <span class="text-danger">*</span></label>
+                            <input type="text" id="resWorkOrder" class="form-control" placeholder="WO-2026-XXXX" required />
+                            <div class="invalid-feedback">작업지시번호는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="resProcessCode" class="form-label">공정 <span class="text-danger">*</span></label>
+                            <select id="resProcessCode" class="form-select" required>
+                                <option value="">-- 공정 선택 --</option>
+                                @foreach (var d in Model.ProcessDefinitions)
+                                {
+                                    <option value="@d.ProcessCode">[@d.ProcessCode] @d.ProcessName</option>
+                                }
+                            </select>
+                            <div class="invalid-feedback">공정을 선택하세요.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="resOperator" class="form-label">작업자 <span class="text-danger">*</span></label>
+                            <input type="text" id="resOperator" class="form-control" placeholder="작업자 이름" required />
+                            <div class="invalid-feedback">작업자는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="resProduced" class="form-label">생산수량 <span class="text-danger">*</span></label>
+                            <input type="number" id="resProduced" class="form-control" min="0" value="0" required />
+                            <div class="invalid-feedback">생산수량은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="resDefect" class="form-label">불량수량</label>
+                            <input type="number" id="resDefect" class="form-control" min="0" value="0" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="resStartTime" class="form-label">시작시간 <span class="text-danger">*</span></label>
+                            <input type="datetime-local" id="resStartTime" class="form-control" required />
+                            <div class="invalid-feedback">시작시간은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="resEndTime" class="form-label">종료시간</label>
+                            <input type="datetime-local" id="resEndTime" class="form-control" />
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary" data-save>
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// ── 공정 정의 탭 필터링 ──────────────────────────────
+function filterDefinitions() {
+    var code = document.getElementById('defFilterCode').value.trim().toLowerCase();
+    var name = document.getElementById('defFilterName').value.trim().toLowerCase();
+    var rows = document.querySelectorAll('#tbodyDefinitions tr[data-code]');
+    var visible = 0;
+    rows.forEach(function(row) {
+        var rCode = (row.dataset.code || '').toLowerCase();
+        var rName = (row.dataset.name || '').toLowerCase();
+        var show  = (!code || rCode.includes(code)) && (!name || rName.includes(name));
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('defCount').textContent = visible;
+}
+function clearDefFilter() {
+    document.getElementById('defFilterCode').value = '';
+    document.getElementById('defFilterName').value = '';
+    filterDefinitions();
+}
+
+// ── 생산 실적 탭 필터링 ──────────────────────────────
+function filterResults() {
+    var wo        = document.getElementById('resFilterWorkOrder').value.trim().toLowerCase();
+    var pc        = document.getElementById('resFilterProcess').value.trim().toLowerCase();
+    var dateFrom  = document.getElementById('resFilterDateFrom').value;
+    var dateTo    = document.getElementById('resFilterDateTo').value;
+    var rows = document.querySelectorAll('#tbodyResults tr[data-workorder]');
+    var visible = 0;
+    rows.forEach(function(row) {
+        var rWo   = (row.dataset.workorder   || '').toLowerCase();
+        var rPc   = (row.dataset.processcode || '').toLowerCase();
+        var rDate = (row.dataset.starttime   || '');
+        var show  = (!wo || rWo.includes(wo))
+                 && (!pc || rPc.includes(pc))
+                 && (!dateFrom || rDate >= dateFrom)
+                 && (!dateTo   || rDate <= dateTo);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('resCount').textContent = visible;
+}
+function clearResFilter() {
+    document.getElementById('resFilterWorkOrder').value = '';
+    document.getElementById('resFilterProcess').value   = '';
+    document.getElementById('resFilterDateFrom').value  = '';
+    document.getElementById('resFilterDateTo').value    = '';
+    filterResults();
+}
+
+// ── 공정 등록 모달 열기 ──────────────────────────────
+function openCreateProcessModal() {
+    document.getElementById('modalProcessTitle').textContent = '공정 등록';
+    document.getElementById('procEditCode').value = '';
+    document.getElementById('formProcess').reset();
+    document.getElementById('formProcess').classList.remove('was-validated');
+    document.getElementById('procCode').removeAttribute('readonly');
+}
+
+// ── 공정 수정 모달 열기 ──────────────────────────────
+function openEditProcessModal(code, name, order, stdTime, eqType) {
+    document.getElementById('modalProcessTitle').textContent = '공정 수정';
+    document.getElementById('procEditCode').value = code;
+    document.getElementById('procCode').value     = code;
+    document.getElementById('procCode').setAttribute('readonly', 'readonly');
+    document.getElementById('procName').value     = name;
+    document.getElementById('procOrder').value    = order;
+    document.getElementById('procStdTime').value  = stdTime;
+    document.getElementById('procEqType').value   = eqType || '';
+    document.getElementById('formProcess').classList.remove('was-validated');
+    var modal = new bootstrap.Modal(document.getElementById('modalProcess'));
+    modal.show();
+}
+
+// ── 공정 삭제 ────────────────────────────────────────
+function deleteProcess(code, name) {
+    if (!confirm('"' + name + '" 공정을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+    msFetch('/api/process/definitions/' + encodeURIComponent(code), { method: 'DELETE' })
+        .then(function(res) {
+            if (res.ok) {
+                showToast('공정이 삭제되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1000);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('삭제 실패: ' + (err.message || '서버 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('삭제 실패: 네트워크 오류', 'danger'); });
+}
+
+// ── 공정 폼 저장 ─────────────────────────────────────
+document.getElementById('formProcess').addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        var f = this.querySelector(':invalid');
+        if (f) f.focus();
+        return;
+    }
+    var editCode = document.getElementById('procEditCode').value;
+    var isEdit   = !!editCode;
+    var data = {
+        processCode:         document.getElementById('procCode').value,
+        processName:         document.getElementById('procName').value,
+        processOrder:        parseInt(document.getElementById('procOrder').value, 10),
+        standardTimeMinutes: parseFloat(document.getElementById('procStdTime').value),
+        equipmentType:       document.getElementById('procEqType').value
+    };
+    var url    = isEdit ? '/api/process/definitions/' + encodeURIComponent(editCode) : '/api/process/definitions';
+    var method = isEdit ? 'PUT' : 'POST';
+
+    msFetch(url, { method: method, body: JSON.stringify(data) })
+        .then(function(res) {
+            if (res.ok || res.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('modalProcess')).hide();
+                showToast('공정이 ' + (isEdit ? '수정' : '등록') + '되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('저장 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('저장 실패: 네트워크 오류', 'danger'); });
+});
+
+// ── 실적 등록 모달 열기 ──────────────────────────────
+function openCreateResultModal() {
+    document.getElementById('formResult').reset();
+    document.getElementById('formResult').classList.remove('was-validated');
+    // 현재 시각을 시작시간 기본값으로
+    var now = new Date();
+    now.setSeconds(0, 0);
+    document.getElementById('resStartTime').value = now.toISOString().slice(0, 16);
+}
+
+// ── 실적 폼 저장 ─────────────────────────────────────
+document.getElementById('formResult').addEventListener('submit', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!this.checkValidity()) {
+        this.classList.add('was-validated');
+        var f = this.querySelector(':invalid');
+        if (f) f.focus();
+        return;
+    }
+    var endVal = document.getElementById('resEndTime').value;
+    var data = {
+        workOrderNo:      document.getElementById('resWorkOrder').value,
+        processCode:      document.getElementById('resProcessCode').value,
+        operator:         document.getElementById('resOperator').value,
+        producedQuantity: parseFloat(document.getElementById('resProduced').value),
+        defectQuantity:   parseFloat(document.getElementById('resDefect').value || '0'),
+        startTime:        new Date(document.getElementById('resStartTime').value).toISOString(),
+        endTime:          endVal ? new Date(endVal).toISOString() : null,
+        createdBy:        ''
+    };
+
+    msFetch('/api/process/results', { method: 'POST', body: JSON.stringify(data) })
+        .then(function(res) {
+            if (res.ok || res.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('modalResult')).hide();
+                showToast('실적이 등록되었습니다.', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                return res.json().then(function(err) {
+                    showToast('등록 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                });
+            }
+        })
+        .catch(function() { showToast('등록 실패: 네트워크 오류', 'danger'); });
+});
+</script>
+}

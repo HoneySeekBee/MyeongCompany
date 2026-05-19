@@ -32,6 +32,65 @@ public class ProcessController : ControllerBase
         return Ok(list);
     }
 
+    /// <summary>공정 정의 등록</summary>
+    [HttpPost("definitions")]
+    public async Task<IActionResult> CreateDefinition(
+        [FromBody] CreateProcessDefinitionRequest req,
+        CancellationToken ct = default)
+    {
+        var existing = await _repo.GetProcessAsync(req.ProcessCode, ct);
+        if (existing is not null)
+            return Conflict(new { message = $"이미 존재하는 공정코드입니다: {req.ProcessCode}" });
+
+        var definition = new ProcessDefinition
+        {
+            ProcessCode         = req.ProcessCode,
+            ProcessName         = req.ProcessName,
+            ProcessOrder        = req.ProcessOrder,
+            StandardTimeMinutes = req.StandardTimeMinutes,
+            EquipmentType       = req.EquipmentType ?? string.Empty,
+            IsActive            = true,
+            CreatedAt           = DateTime.UtcNow,
+            CreatedBy           = User.Identity?.Name ?? "system"
+        };
+        await _repo.AddProcessAsync(definition, ct);
+        return CreatedAtAction(nameof(GetDefinitions), new { }, new { processCode = definition.ProcessCode });
+    }
+
+    /// <summary>공정 정의 수정</summary>
+    [HttpPut("definitions/{processCode}")]
+    public async Task<IActionResult> UpdateDefinition(
+        string processCode,
+        [FromBody] CreateProcessDefinitionRequest req,
+        CancellationToken ct = default)
+    {
+        var existing = await _repo.GetProcessAsync(processCode, ct);
+        if (existing is null)
+            return NotFound(new { message = $"공정을 찾을 수 없습니다: {processCode}" });
+
+        existing.ProcessName         = req.ProcessName;
+        existing.ProcessOrder        = req.ProcessOrder;
+        existing.StandardTimeMinutes = req.StandardTimeMinutes;
+        existing.EquipmentType       = req.EquipmentType ?? string.Empty;
+        await _repo.UpdateProcessAsync(existing, ct);
+        return NoContent();
+    }
+
+    /// <summary>공정 정의 삭제 (비활성화)</summary>
+    [HttpDelete("definitions/{processCode}")]
+    public async Task<IActionResult> DeleteDefinition(
+        string processCode,
+        CancellationToken ct = default)
+    {
+        var existing = await _repo.GetProcessAsync(processCode, ct);
+        if (existing is null)
+            return NotFound(new { message = $"공정을 찾을 수 없습니다: {processCode}" });
+
+        existing.IsActive = false;
+        await _repo.UpdateProcessAsync(existing, ct);
+        return NoContent();
+    }
+
     /// <summary>생산실적 등록</summary>
     [HttpPost("results")]
     public async Task<IActionResult> CreateResult(
@@ -67,3 +126,10 @@ public class ProcessController : ControllerBase
         return Ok(summary);
     }
 }
+
+public sealed record CreateProcessDefinitionRequest(
+    string ProcessCode,
+    string ProcessName,
+    int ProcessOrder,
+    decimal StandardTimeMinutes,
+    string? EquipmentType);
