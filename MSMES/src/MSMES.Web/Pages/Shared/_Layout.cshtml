@@ -1,48 +1,207 @@
 @{
-    var title = ViewData["Title"] as string ?? "MSMES";
+    var pageTitle   = ViewData["Title"] as string ?? "MSMES";
+    var userName    = User.Identity?.Name ?? "사용자";
+    var userInitial = userName.Length > 0 ? userName.Substring(0, 1).ToUpper() : "U";
 }
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@title - MSMES</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #f4f6f9; }
-        .layout { display: flex; min-height: 100vh; }
-        .sidebar { width: 220px; background: #2c3e50; color: #ecf0f1; padding: 20px 0; }
-        .sidebar h2 { padding: 0 20px; margin: 0 0 20px; font-size: 18px; }
-        .sidebar a { display: block; color: #ecf0f1; padding: 10px 20px; text-decoration: none; }
-        .sidebar a:hover, .sidebar a.active { background: #34495e; }
-        .content { flex: 1; padding: 24px; }
-        .topbar { background: #fff; padding: 12px 20px; border-bottom: 1px solid #ddd; display:flex; justify-content:space-between; }
-        table { width: 100%; border-collapse: collapse; background: #fff; }
-        th, td { padding: 8px 12px; border-bottom: 1px solid #eee; text-align: left; }
-        th { background: #f0f2f5; }
-        .btn { padding: 6px 14px; background: #3498db; color:#fff; border:none; border-radius:4px; cursor:pointer; text-decoration:none; }
-    </style>
+    <title>@pageTitle - MSMES</title>
+
+    <!-- Google Fonts: Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- Bootstrap 5.3 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+
+    <!-- Bootstrap Icons 1.11 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <!-- MSMES 공통 CSS -->
+    <link rel="stylesheet" href="~/css/mes.css" asp-append-version="true" />
+
+    @await RenderSectionAsync("Styles", required: false)
 </head>
 <body>
-<div class="layout">
-    <nav class="sidebar">
-        <h2>MSMES</h2>
-        <a href="/">대시보드</a>
-        <a href="/SalesOrders">수주</a>
-        <a href="/PurchaseOrders">발주</a>
-        <a href="/WorkOrders">작업지시</a>
-        <a href="/Lots">LOT 관리</a>
-        <a href="/Shipments">출하</a>
-    </nav>
-    <main class="content">
-        <div class="topbar">
-            <strong>@title</strong>
-            <span>@User.Identity?.Name</span>
+
+<!-- 모바일 오버레이 -->
+<div id="msOverlay" class="ms-overlay" aria-hidden="true"></div>
+
+<div class="ms-wrapper">
+
+    <!-- ════════════════════════════════════════════
+         사이드바
+    ════════════════════════════════════════════ -->
+    <nav id="msSidebar" class="ms-sidebar" aria-label="주 메뉴">
+
+        <!-- 로고 -->
+        <a href="/" class="ms-sidebar__brand" aria-label="MSMES 홈">
+            <div class="ms-sidebar__brand-icon">
+                <i class="bi bi-cpu"></i>
+            </div>
+            <span class="ms-sidebar__brand-text">MSMES</span>
+        </a>
+
+        <div class="ms-sidebar__nav">
+
+            <!-- 대시보드 -->
+            <a href="/" class="ms-sidebar__link" aria-label="대시보드">
+                <i class="bi bi-speedometer2"></i>
+                <span class="ms-sidebar__link-text">대시보드</span>
+            </a>
+
+            <hr class="ms-sidebar__divider" />
+
+            <!-- 영업/구매 -->
+            <div class="ms-sidebar__group-label">영업 / 구매</div>
+
+            <a href="/SalesOrders" class="ms-sidebar__link" aria-label="수주관리">
+                <i class="bi bi-file-earmark-text"></i>
+                <span class="ms-sidebar__link-text">수주관리</span>
+            </a>
+            <a href="/PurchaseOrders" class="ms-sidebar__link" aria-label="발주관리">
+                <i class="bi bi-cart3"></i>
+                <span class="ms-sidebar__link-text">발주관리</span>
+            </a>
+
+            <hr class="ms-sidebar__divider" />
+
+            <!-- 생산관리 -->
+            <div class="ms-sidebar__group-label">생산관리</div>
+
+            <a href="/WorkOrders" class="ms-sidebar__link" aria-label="작업지시">
+                <i class="bi bi-gear"></i>
+                <span class="ms-sidebar__link-text">작업지시</span>
+            </a>
+            <a href="/Lots" class="ms-sidebar__link" aria-label="LOT관리">
+                <i class="bi bi-tags"></i>
+                <span class="ms-sidebar__link-text">LOT관리</span>
+            </a>
+            <a href="/Process" class="ms-sidebar__link" aria-label="공정관리">
+                <i class="bi bi-diagram-3"></i>
+                <span class="ms-sidebar__link-text">공정관리</span>
+            </a>
+
+            <hr class="ms-sidebar__divider" />
+
+            <!-- 물류 -->
+            <div class="ms-sidebar__group-label">물류</div>
+
+            <a href="/Inventory" class="ms-sidebar__link" aria-label="재고관리">
+                <i class="bi bi-box-seam"></i>
+                <span class="ms-sidebar__link-text">재고관리</span>
+            </a>
+            <a href="/Shipments" class="ms-sidebar__link" aria-label="출하관리">
+                <i class="bi bi-truck"></i>
+                <span class="ms-sidebar__link-text">출하관리</span>
+            </a>
+
+            <hr class="ms-sidebar__divider" />
+
+            <!-- 품질/설비 -->
+            <div class="ms-sidebar__group-label">품질 / 설비</div>
+
+            <a href="/Quality" class="ms-sidebar__link" aria-label="품질관리">
+                <i class="bi bi-patch-check"></i>
+                <span class="ms-sidebar__link-text">품질관리</span>
+            </a>
+            <a href="/Equipment" class="ms-sidebar__link" aria-label="설비관리">
+                <i class="bi bi-wrench-adjustable"></i>
+                <span class="ms-sidebar__link-text">설비관리</span>
+            </a>
+
+        </div><!-- /.ms-sidebar__nav -->
+
+        <!-- 사이드바 하단 사용자 -->
+        <div class="ms-sidebar__footer">
+            <div class="ms-sidebar__footer-avatar" aria-hidden="true">@userInitial</div>
+            <span class="ms-sidebar__footer-name">@userName</span>
         </div>
-        <div style="padding-top: 20px;">
+
+    </nav><!-- /.ms-sidebar -->
+
+    <!-- ════════════════════════════════════════════
+         메인 영역
+    ════════════════════════════════════════════ -->
+    <div class="ms-main">
+
+        <!-- 헤더 -->
+        <header class="ms-header" role="banner">
+            <button id="msSidebarToggle" class="ms-header__toggle" type="button"
+                    aria-label="메뉴 열기/닫기" aria-expanded="false" aria-controls="msSidebar">
+                <i class="bi bi-list"></i>
+            </button>
+
+            <h1 class="ms-header__title">@pageTitle</h1>
+
+            <div class="ms-header__actions">
+                <!-- 알림 -->
+                <button type="button" class="btn btn-sm btn-light position-relative" aria-label="알림" title="알림">
+                    <i class="bi bi-bell"></i>
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px;">
+                        3<span class="visually-hidden">개의 읽지 않은 알림</span>
+                    </span>
+                </button>
+
+                <!-- 사용자 정보 -->
+                <div class="ms-header__user">
+                    <div class="ms-header__user-avatar" aria-hidden="true">@userInitial</div>
+                    <span class="d-none d-md-inline">@userName</span>
+                </div>
+
+                <!-- 로그아웃 -->
+                <a href="/Account/Logout" class="btn btn-sm btn-outline-secondary" aria-label="로그아웃">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="d-none d-sm-inline ms-1">로그아웃</span>
+                </a>
+            </div>
+        </header>
+
+        <!-- 컨텐츠 -->
+        <main class="ms-content" id="mainContent" role="main">
             @RenderBody()
-        </div>
-    </main>
-</div>
+        </main>
+
+    </div><!-- /.ms-main -->
+
+</div><!-- /.ms-wrapper -->
+
+<!-- Toast 컨테이너 -->
+<div id="ms-toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Bootstrap 5.3 JS Bundle (Popper 포함) -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmUXCfAA3oGMlX2F8vaXIbAZLkJ" crossorigin="anonymous"></script>
+
+<!-- Chart.js 4.x -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+<!-- MSMES 공통 JS -->
+<script src="~/js/mes.js" asp-append-version="true"></script>
+
+<!-- 사이드바 활성 메뉴 강조 -->
+<script>
+(function() {
+    var path = window.location.pathname.toLowerCase().replace(/\/$/, '') || '/';
+    var links = document.querySelectorAll('.ms-sidebar__link');
+    var best = null, bestLen = 0;
+    links.forEach(function(link) {
+        var href = (link.getAttribute('href') || '').toLowerCase().replace(/\/$/, '') || '/';
+        if (href === '/' && path === '/') {
+            if (1 > bestLen) { best = link; bestLen = 1; }
+        } else if (href !== '/' && path.startsWith(href) && href.length > bestLen) {
+            best = link; bestLen = href.length;
+        }
+    });
+    if (best) best.classList.add('active');
+})();
+</script>
+
+@await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

@@ -1,0 +1,67 @@
+@page
+@model MSMES.Web.Pages.Inventory.IndexModel
+@{ ViewData["Title"] = "재고 관리"; }
+
+<h1>재고 현황</h1>
+
+<div style="display:flex; gap:16px; margin-bottom:20px;">
+    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #3498db; box-shadow:0 1px 4px rgba(0,0,0,.08);">
+        <div style="font-size:12px; color:#888;">전체 품목수</div>
+        <div style="font-size:28px; font-weight:700; color:#2c3e50;">@Model.TotalCount</div>
+    </div>
+    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #e67e22; box-shadow:0 1px 4px rgba(0,0,0,.08);">
+        <div style="font-size:12px; color:#888;">부족재고 건수</div>
+        <div style="font-size:28px; font-weight:700; color:#e67e22;">@Model.LowStockCount</div>
+    </div>
+    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #e74c3c; box-shadow:0 1px 4px rgba(0,0,0,.08);">
+        <div style="font-size:12px; color:#888;">소진(재고 없음)</div>
+        <div style="font-size:28px; font-weight:700; color:#e74c3c;">@Model.OutOfStockCount</div>
+    </div>
+</div>
+
+<table style="margin-top:8px;">
+    <thead>
+        <tr>
+            <th>품목코드</th>
+            <th>품목명</th>
+            <th>창고</th>
+            <th>현재재고</th>
+            <th>안전재고</th>
+            <th>단위</th>
+            <th>상태</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var inv in Model.Inventories)
+    {
+        var rowStyle = inv.Status switch
+        {
+            MSMES.Domain.Inventory.InventoryStatus.OutOfStock => "background:#fdecea;",
+            MSMES.Domain.Inventory.InventoryStatus.LowStock   => "background:#fff3e0;",
+            _                                                  => ""
+        };
+        var badge = inv.Status switch
+        {
+            MSMES.Domain.Inventory.InventoryStatus.OutOfStock =>
+                "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>소진</span>",
+            MSMES.Domain.Inventory.InventoryStatus.LowStock =>
+                "<span style='background:#e67e22;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>부족</span>",
+            _ =>
+                "<span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>정상</span>"
+        };
+        <tr style="@rowStyle">
+            <td>@inv.ItemCode</td>
+            <td>@inv.ItemName</td>
+            <td>@inv.WarehouseCode</td>
+            <td style="text-align:right;">@inv.CurrentStock.ToString("N2")</td>
+            <td style="text-align:right;">@inv.SafetyStock.ToString("N2")</td>
+            <td>@inv.Unit</td>
+            <td>@Html.Raw(badge)</td>
+        </tr>
+    }
+    @if (!Model.Inventories.Any())
+    {
+        <tr><td colspan="7" style="text-align:center; color:#aaa; padding:24px;">데이터가 없습니다.</td></tr>
+    }
+    </tbody>
+</table>

@@ -1,23 +1,337 @@
 @page
 @model MSMES.Web.Pages.SalesOrders.IndexModel
-@{ ViewData["Title"] = "수주 관리"; }
+@{
+    ViewData["Title"] = "수주관리";
+}
 
-<h1>수주 목록</h1>
-<a class="btn" href="#">신규 수주</a>
-<table style="margin-top:16px;">
-    <thead>
-        <tr><th>수주번호</th><th>고객</th><th>수주일</th><th>납기일</th><th>상태</th></tr>
-    </thead>
-    <tbody>
-    @foreach (var s in Model.Orders)
-    {
-        <tr>
-            <td>@s.SalesOrderNo</td>
-            <td>@s.CustomerName</td>
-            <td>@s.OrderDate.ToString("yyyy-MM-dd")</td>
-            <td>@s.DueDate.ToString("yyyy-MM-dd")</td>
-            <td>@s.Status</td>
-        </tr>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-file-earmark-text me-2 text-primary-ms"></i>수주관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active" aria-current="page">수주관리</li>
+            </ol>
+        </nav>
+    </div>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSalesOrder"
+            onclick="openCreateModal()" aria-label="수주 등록">
+        <i class="bi bi-plus-lg me-1"></i>수주 등록
+    </button>
+</div>
+
+<!-- 검색 필터 카드 -->
+<div class="ms-filter-card">
+    <form id="searchForm" method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
+            <label for="filterOrderNo" class="form-label text-muted-sm mb-1">수주번호</label>
+            <input type="text" id="filterOrderNo" name="orderNo" class="form-control form-control-sm"
+                   placeholder="SO-2026-..." value="@Request.Query["orderNo"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
+            <label for="filterCustomer" class="form-label text-muted-sm mb-1">고객명</label>
+            <input type="text" id="filterCustomer" name="customer" class="form-control form-control-sm"
+                   placeholder="고객사명" value="@Request.Query["customer"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-2 col-lg-2">
+            <label for="filterStatus" class="form-label text-muted-sm mb-1">상태</label>
+            <select id="filterStatus" name="status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                @{ var selStatus = Request.Query["status"].ToString(); }
+                <option value="Draft"        selected="@(selStatus == "Draft"        ? "selected" : null)">초안</option>
+                <option value="Confirmed"    selected="@(selStatus == "Confirmed"    ? "selected" : null)">확정</option>
+                <option value="InProduction" selected="@(selStatus == "InProduction" ? "selected" : null)">생산중</option>
+                <option value="Shipped"      selected="@(selStatus == "Shipped"      ? "selected" : null)">출하완료</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-2 col-lg-2">
+            <label for="filterDateFrom" class="form-label text-muted-sm mb-1">수주일 From</label>
+            <input type="date" id="filterDateFrom" name="dateFrom" class="form-control form-control-sm"
+                   value="@Request.Query["dateFrom"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-2 col-lg-2">
+            <label for="filterDateTo" class="form-label text-muted-sm mb-1">수주일 To</label>
+            <input type="date" id="filterDateTo" name="dateTo" class="form-control form-control-sm"
+                   value="@Request.Query["dateTo"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-auto d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary" aria-label="검색">
+                <i class="bi bi-search me-1"></i>검색
+            </button>
+            <a href="/SalesOrders" class="btn btn-sm btn-outline-secondary" aria-label="초기화">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- 테이블 카드 -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <h2 class="ms-card__title">수주 목록</h2>
+        <span class="text-muted-sm">총 <strong>@Model.Orders.Count</strong>건</span>
+    </div>
+    <div class="ms-card__body p-0">
+        <div class="mes-table-wrapper">
+            <table class="mes-table" aria-label="수주 목록 테이블">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width:40px;">
+                            <input type="checkbox" class="form-check-input" id="checkAll"
+                                   aria-label="전체선택" onclick="toggleAllCheckboxes(this)" />
+                        </th>
+                        <th scope="col">수주번호</th>
+                        <th scope="col">고객명</th>
+                        <th scope="col">수주일</th>
+                        <th scope="col">납기일</th>
+                        <th scope="col">금액</th>
+                        <th scope="col">상태</th>
+                        <th scope="col" style="width:100px;">액션</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (!Model.Orders.Any())
+                {
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted-sm">
+                            <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4;"></i>
+                            수주 데이터가 없습니다.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var s in Model.Orders)
+                    {
+                        var statusBadge = s.Status switch
+                        {
+                            MSMES.Domain.SalesOrder.SalesOrderStatus.Draft        => ("status-badge-draft",        "초안"),
+                            MSMES.Domain.SalesOrder.SalesOrderStatus.Confirmed    => ("status-badge-confirmed",    "확정"),
+                            MSMES.Domain.SalesOrder.SalesOrderStatus.InProduction => ("status-badge-inproduction", "생산중"),
+                            MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped      => ("status-badge-shipped",      "출하완료"),
+                            _                                                      => ("status-badge-draft",        s.Status.ToString())
+                        };
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input row-check"
+                                       value="@s.SalesOrderNo" aria-label="행 선택" />
+                            </td>
+                            <td>
+                                <a href="#" class="text-primary-ms fw-600"
+                                   onclick="openDetailModal('@s.SalesOrderNo'); return false;">
+                                    @s.SalesOrderNo
+                                </a>
+                            </td>
+                            <td>@s.CustomerName</td>
+                            <td>@s.OrderDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                @{
+                                    var isOverdue = s.DueDate < DateTime.Today && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped;
+                                }
+                                <span class="@(isOverdue ? "text-danger fw-600" : "")">
+                                    @s.DueDate.ToString("yyyy-MM-dd")
+                                    @if (isOverdue)
+                                    {
+                                        <i class="bi bi-exclamation-circle-fill ms-1" title="납기 초과"></i>
+                                    }
+                                </span>
+                            </td>
+                            <td>—</td>
+                            <td>
+                                <span class="ms-badge @statusBadge.Item1">@statusBadge.Item2</span>
+                            </td>
+                            <td>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn-icon"
+                                            onclick="openEditModal('@s.SalesOrderNo')"
+                                            aria-label="수정" title="수정">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button" class="btn-icon btn-icon-danger"
+                                            onclick="confirmDeleteOrder('@s.SalesOrderNo')"
+                                            aria-label="삭제" title="삭제">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     수주 등록/수정 모달
+════════════════════════════════════════════ -->
+<div class="modal fade" id="modalSalesOrder" tabindex="-1"
+     aria-labelledby="modalSalesOrderLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalSalesOrderLabel">
+                    <i class="bi bi-file-earmark-plus me-2"></i>
+                    <span id="modalSalesOrderTitle">수주 등록</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formSalesOrder" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <input type="hidden" id="soId" name="id" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="soOrderNo" class="form-label">
+                                수주번호 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="soOrderNo" name="salesOrderNo"
+                                   class="form-control" placeholder="SO-2026-XXXX" required />
+                            <div class="invalid-feedback">수주번호는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soCustomer" class="form-label">
+                                고객명 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="soCustomer" name="customerName"
+                                   class="form-control" placeholder="고객사명" required />
+                            <div class="invalid-feedback">고객명은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soOrderDate" class="form-label">
+                                수주일 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="soOrderDate" name="orderDate"
+                                   class="form-control" required />
+                            <div class="invalid-feedback">수주일은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soDueDate" class="form-label">
+                                납기일 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="soDueDate" name="dueDate"
+                                   class="form-control" required />
+                            <div class="invalid-feedback">납기일은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soStatus" class="form-label">상태</label>
+                            <select id="soStatus" name="status" class="form-select">
+                                <option value="Draft">초안</option>
+                                <option value="Confirmed">확정</option>
+                                <option value="InProduction">생산중</option>
+                                <option value="Shipped">출하완료</option>
+                                <option value="Cancelled">취소</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soAmount" class="form-label">수주금액</label>
+                            <div class="input-group">
+                                <span class="input-group-text">₩</span>
+                                <input type="number" id="soAmount" name="amount"
+                                       class="form-control" placeholder="0" min="0" />
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label for="soNote" class="form-label">비고</label>
+                            <textarea id="soNote" name="note" class="form-control" rows="2"
+                                      placeholder="특이사항을 입력하세요"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        취소
+                    </button>
+                    <button type="submit" class="btn btn-primary" data-save aria-label="저장">
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    // 전체 체크박스 토글
+    function toggleAllCheckboxes(master) {
+        document.querySelectorAll('.row-check').forEach(function(cb) {
+            cb.checked = master.checked;
+        });
     }
-    </tbody>
-</table>
+
+    // 등록 모달 열기
+    function openCreateModal() {
+        document.getElementById('modalSalesOrderTitle').textContent = '수주 등록';
+        document.getElementById('formSalesOrder').reset();
+        document.getElementById('formSalesOrder').classList.remove('was-validated');
+        var today = new Date().toISOString().slice(0, 10);
+        document.getElementById('soOrderDate').value = today;
+    }
+
+    // 수정 모달 열기
+    function openEditModal(orderNo) {
+        document.getElementById('modalSalesOrderTitle').textContent = '수주 수정';
+        document.getElementById('formSalesOrder').classList.remove('was-validated');
+        document.getElementById('soOrderNo').value = orderNo;
+        var modal = new bootstrap.Modal(document.getElementById('modalSalesOrder'));
+        modal.show();
+    }
+
+    // 상세보기
+    function openDetailModal(orderNo) {
+        openEditModal(orderNo);
+    }
+
+    // 삭제 확인
+    function confirmDeleteOrder(orderNo) {
+        if (confirm('"' + orderNo + '" 수주를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
+            msFetch('/api/salesorders/' + orderNo, { method: 'DELETE' })
+                .then(function(res) {
+                    if (res.ok) {
+                        showToast('수주가 삭제되었습니다.', 'success');
+                        setTimeout(function() { location.reload(); }, 1000);
+                    } else {
+                        showToast('삭제 실패: 서버 오류', 'danger');
+                    }
+                })
+                .catch(function() {
+                    showToast('삭제 실패: 네트워크 오류', 'danger');
+                });
+        }
+    }
+
+    // 폼 저장
+    document.getElementById('formSalesOrder').addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!this.checkValidity()) {
+            this.classList.add('was-validated');
+            var firstInvalid = this.querySelector(':invalid');
+            if (firstInvalid) firstInvalid.focus();
+            return;
+        }
+        var data = Object.fromEntries(new FormData(this).entries());
+        var isEdit = !!data.id;
+        var url    = isEdit ? '/api/salesorders/' + data.id : '/api/salesorders';
+        var method = isEdit ? 'PUT' : 'POST';
+
+        msFetch(url, { method: method, body: JSON.stringify(data) })
+            .then(function(res) {
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('modalSalesOrder')).hide();
+                    showToast('수주가 ' + (isEdit ? '수정' : '등록') + '되었습니다.', 'success');
+                    setTimeout(function() { location.reload(); }, 1200);
+                } else {
+                    return res.json().then(function(err) {
+                        showToast('저장 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                    });
+                }
+            })
+            .catch(function() {
+                showToast('저장 실패: 네트워크 오류', 'danger');
+            });
+    });
+</script>
+}

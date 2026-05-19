@@ -1,0 +1,644 @@
+/* =========================================================
+   MSMES — 공통 스타일시트
+   Bootstrap 5.3 기반, Noto Sans KR
+   ========================================================= */
+
+/* ── CSS 변수 ─────────────────────────────────────────── */
+:root {
+    --ms-primary:       #1a73e8;
+    --ms-primary-hover: #1557b0;
+    --ms-success:       #28a745;
+    --ms-warning:       #ffc107;
+    --ms-danger:        #dc3545;
+    --ms-info:          #17a2b8;
+    --ms-dark:          #1e2a3a;
+    --ms-dark-2:        #27374d;
+    --ms-bg:            #f5f7fa;
+    --ms-card:          #ffffff;
+    --ms-text:          #212529;
+    --ms-muted:         #6c757d;
+    --ms-border:        #e3e6ea;
+    --sidebar-width:    260px;
+    --sidebar-collapsed-width: 64px;
+    --header-height:    56px;
+    --card-shadow:      0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --card-radius:      8px;
+}
+
+/* ── 기본 ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    height: 100%;
+    font-family: 'Noto Sans KR', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ms-text);
+    background-color: var(--ms-bg);
+    margin: 0;
+}
+
+/* ── 레이아웃 래퍼 ────────────────────────────────────── */
+.ms-wrapper {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ── 사이드바 ──────────────────────────────────────────── */
+.ms-sidebar {
+    width: var(--sidebar-width);
+    min-height: 100vh;
+    background-color: var(--ms-dark);
+    color: #cfd8e3;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1040;
+    transition: transform 0.25s ease, width 0.25s ease;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+/* 사이드바 로고 영역 */
+.ms-sidebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    height: var(--header-height);
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.ms-sidebar__brand-icon {
+    width: 32px;
+    height: 32px;
+    background: var(--ms-primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.ms-sidebar__brand-text {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+/* 사이드바 내비 */
+.ms-sidebar__nav {
+    flex: 1;
+    padding: 12px 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.ms-sidebar__nav::-webkit-scrollbar {
+    width: 4px;
+}
+.ms-sidebar__nav::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+}
+
+/* 그룹 레이블 */
+.ms-sidebar__group-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255,255,255,0.35);
+    padding: 16px 20px 6px;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+/* 구분선 */
+.ms-sidebar__divider {
+    border: none;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin: 8px 0;
+}
+
+/* 메뉴 항목 */
+.ms-sidebar__link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 44px;
+    padding: 0 20px;
+    color: #cfd8e3;
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.ms-sidebar__link:hover {
+    background-color: var(--ms-dark-2);
+    color: #fff;
+    border-left-color: rgba(26,115,232,0.5);
+}
+
+.ms-sidebar__link.active {
+    background-color: var(--ms-dark-2);
+    color: #fff;
+    border-left-color: var(--ms-primary);
+    font-weight: 600;
+}
+
+.ms-sidebar__link i {
+    font-size: 16px;
+    flex-shrink: 0;
+    width: 20px;
+    text-align: center;
+}
+
+.ms-sidebar__link-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 사이드바 하단 사용자 영역 */
+.ms-sidebar__footer {
+    padding: 12px 20px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.ms-sidebar__footer-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--ms-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.ms-sidebar__footer-name {
+    font-size: 13px;
+    color: #cfd8e3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── 메인 컨텐츠 영역 ─────────────────────────────────── */
+.ms-main {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    transition: margin-left 0.25s ease;
+}
+
+/* ── 헤더 ──────────────────────────────────────────────── */
+.ms-header {
+    height: var(--header-height);
+    background: var(--ms-card);
+    border-bottom: 1px solid var(--ms-border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+    gap: 12px;
+}
+
+.ms-header__toggle {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--ms-text);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.ms-header__toggle:hover {
+    background: var(--ms-bg);
+}
+
+.ms-header__title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ms-text);
+    flex: 1;
+}
+
+.ms-header__actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ms-header__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    color: var(--ms-text);
+}
+
+.ms-header__user-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--ms-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+}
+
+/* ── 컨텐츠 패딩 ──────────────────────────────────────── */
+.ms-content {
+    flex: 1;
+    padding: 24px;
+}
+
+/* ── 페이지 헤더 (breadcrumb 포함) ───────────────────── */
+.ms-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.ms-page-header__left h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 4px;
+}
+
+.ms-page-header__left .breadcrumb {
+    margin: 0;
+    font-size: 12px;
+    color: var(--ms-muted);
+}
+
+/* ── 카드 ──────────────────────────────────────────────── */
+.ms-card {
+    background: var(--ms-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--ms-border);
+}
+
+.ms-card__header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--ms-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.ms-card__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ms-text);
+    margin: 0;
+}
+
+.ms-card__body {
+    padding: 20px;
+}
+
+/* ── KPI 카드 ──────────────────────────────────────────── */
+.kpi-card {
+    background: var(--ms-card);
+    border-radius: var(--card-radius);
+    box-shadow: var(--card-shadow);
+    border: 1px solid var(--ms-border);
+    border-left: 4px solid var(--ms-primary);
+    padding: 18px 20px;
+    height: 100%;
+    transition: box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.kpi-card.kpi-success  { border-left-color: var(--ms-success); }
+.kpi-card.kpi-warning  { border-left-color: var(--ms-warning); }
+.kpi-card.kpi-danger   { border-left-color: var(--ms-danger); }
+.kpi-card.kpi-info     { border-left-color: var(--ms-info); }
+.kpi-card.kpi-primary  { border-left-color: var(--ms-primary); }
+.kpi-card.kpi-secondary{ border-left-color: var(--ms-muted); }
+
+.kpi-card__label {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--ms-muted);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.kpi-card__label i {
+    font-size: 18px;
+    opacity: 0.6;
+}
+
+.kpi-card__value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ms-primary);
+    line-height: 1.2;
+    margin-bottom: 6px;
+}
+
+.kpi-card__sub {
+    font-size: 12px;
+    color: var(--ms-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.kpi-card__sub .trend-up   { color: var(--ms-success); }
+.kpi-card__sub .trend-down { color: var(--ms-danger); }
+
+/* ── 상태 뱃지 ─────────────────────────────────────────── */
+.status-badge-draft        { background: #6c757d; color: #fff; }
+.status-badge-planned      { background: #6c757d; color: #fff; }
+.status-badge-confirmed    { background: var(--ms-primary); color: #fff; }
+.status-badge-inprogress   { background: var(--ms-info); color: #fff; }
+.status-badge-inproduction { background: var(--ms-warning); color: #212529; }
+.status-badge-completed    { background: var(--ms-success); color: #fff; }
+.status-badge-shipped      { background: var(--ms-success); color: #fff; }
+.status-badge-cancelled    { background: var(--ms-danger); color: #fff; }
+.status-badge-pending      { background: var(--ms-warning); color: #212529; }
+.status-badge-passed       { background: var(--ms-success); color: #fff; }
+.status-badge-failed       { background: var(--ms-danger); color: #fff; }
+
+/* 공통 뱃지 크기 */
+.ms-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* ── MES 테이블 ────────────────────────────────────────── */
+.mes-table-wrapper {
+    overflow-x: auto;
+}
+
+.mes-table {
+    width: 100%;
+    font-size: 13px;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.mes-table thead th {
+    background: #f8f9fa;
+    color: var(--ms-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--ms-border);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+}
+
+.mes-table tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--ms-border);
+    vertical-align: middle;
+}
+
+.mes-table tbody tr:hover td {
+    background-color: #f0f4ff;
+}
+
+.mes-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── 검색 필터 카드 ────────────────────────────────────── */
+.ms-filter-card {
+    background: var(--ms-card);
+    border-radius: var(--card-radius);
+    border: 1px solid var(--ms-border);
+    box-shadow: var(--card-shadow);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+}
+
+/* ── 프로그레스바 ─────────────────────────────────────── */
+.ms-progress {
+    height: 6px;
+    border-radius: 3px;
+    background-color: #e9ecef;
+    overflow: hidden;
+    margin-top: 6px;
+}
+
+.ms-progress-bar {
+    height: 100%;
+    border-radius: 3px;
+    background-color: var(--ms-primary);
+    transition: width 0.4s ease;
+}
+
+/* ── Toast 영역 ────────────────────────────────────────── */
+#ms-toast-container {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.ms-toast {
+    pointer-events: all;
+    min-width: 280px;
+    max-width: 380px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: ms-toast-in 0.25s ease;
+}
+
+.ms-toast.toast-success { background: var(--ms-success); }
+.ms-toast.toast-danger  { background: var(--ms-danger); }
+.ms-toast.toast-warning { background: var(--ms-warning); color: #212529; }
+.ms-toast.toast-info    { background: var(--ms-info); }
+
+@keyframes ms-toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── 차트 컨테이너 ────────────────────────────────────── */
+.chart-container {
+    position: relative;
+}
+
+/* ── 반응형 ────────────────────────────────────────────── */
+
+/* 1200px 이상: 정상 레이아웃 */
+@media (min-width: 1200px) {
+    .ms-sidebar { width: var(--sidebar-width); }
+    .ms-main    { margin-left: var(--sidebar-width); }
+}
+
+/* 768px ~ 1199px: 사이드바 아이콘만 */
+@media (min-width: 768px) and (max-width: 1199px) {
+    .ms-sidebar {
+        width: var(--sidebar-collapsed-width);
+    }
+    .ms-sidebar__brand-text,
+    .ms-sidebar__link-text,
+    .ms-sidebar__group-label,
+    .ms-sidebar__footer-name {
+        display: none;
+    }
+    .ms-sidebar__brand {
+        justify-content: center;
+        padding: 0 16px;
+    }
+    .ms-sidebar__link {
+        justify-content: center;
+        padding: 0;
+        height: 48px;
+    }
+    .ms-sidebar__link i {
+        width: auto;
+    }
+    .ms-sidebar__footer {
+        justify-content: center;
+        padding: 12px;
+    }
+    .ms-main {
+        margin-left: var(--sidebar-collapsed-width);
+    }
+}
+
+/* 768px 미만: 사이드바 오프캔버스 */
+@media (max-width: 767.98px) {
+    .ms-sidebar {
+        transform: translateX(-100%);
+        width: var(--sidebar-width);
+    }
+    .ms-sidebar.ms-sidebar--open {
+        transform: translateX(0);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.3);
+    }
+    .ms-main {
+        margin-left: 0;
+    }
+    .ms-header__toggle {
+        display: flex;
+        align-items: center;
+    }
+    .ms-overlay {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.4);
+        z-index: 1039;
+    }
+    .ms-content {
+        padding: 16px;
+    }
+}
+
+.ms-overlay {
+    display: none;
+}
+
+/* ── 유틸리티 ──────────────────────────────────────────── */
+.text-primary-ms { color: var(--ms-primary) !important; }
+.text-muted-sm { font-size: 12px; color: var(--ms-muted); }
+.fw-600 { font-weight: 600; }
+
+/* 아이콘 버튼 */
+.btn-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 14px;
+    border: 1px solid var(--ms-border);
+    background: #fff;
+    color: var(--ms-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+}
+
+.btn-icon:hover {
+    background: var(--ms-bg);
+    color: var(--ms-text);
+    border-color: #adb5bd;
+}
+
+.btn-icon.btn-icon-danger:hover {
+    background: #fff0f0;
+    color: var(--ms-danger);
+    border-color: var(--ms-danger);
+}
+
+/* 스켈레톤 로딩 */
+.skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.4s infinite;
+    border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}

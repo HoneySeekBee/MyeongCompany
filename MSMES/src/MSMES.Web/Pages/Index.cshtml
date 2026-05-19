@@ -1,6 +1,291 @@
 @page
 @model MSMES.Web.Pages.IndexModel
-@{ ViewData["Title"] = "대시보드"; }
+@{
+    ViewData["Title"] = "대시보드";
+    var today = DateTime.Now.ToString("yyyy년 MM월 dd일 (ddd)", new System.Globalization.CultureInfo("ko-KR"));
+}
 
-<h1>MES 대시보드</h1>
-<p>수주, 발주, 작업지시, LOT, 출하를 통합 관리합니다.</p>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-speedometer2 me-2 text-primary-ms"></i>대시보드</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item active" aria-current="page">대시보드</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <span class="text-muted-sm">
+            <i class="bi bi-calendar3 me-1"></i>@today
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadDashboardData()" aria-label="새로고침">
+            <i class="bi bi-arrow-clockwise"></i>
+        </button>
+    </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────
+     KPI 카드 (2행 × 3열)
+────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <!-- 오늘 생산실적 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                오늘의 생산실적
+                <i class="bi bi-bar-chart-fill text-primary-ms"></i>
+            </div>
+            <div class="kpi-card__value" data-kpi="todayProduced">
+                <span class="skeleton" style="display:inline-block;width:80px;height:34px;border-radius:4px;"></span>
+            </div>
+            <div class="kpi-card__sub">
+                목표 <span data-kpi="todayTarget" class="ms-1 fw-600">—</span>
+                <span class="ms-2 trend-up"><i class="bi bi-arrow-up-short"></i>104%</span>
+            </div>
+            <div class="ms-progress mt-2">
+                <div class="ms-progress-bar bg-primary" style="width:104%" id="kpiProdProgress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 수주잔고 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-info">
+            <div class="kpi-card__label">
+                수주 잔고
+                <i class="bi bi-file-earmark-text" style="color:var(--ms-info)"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-info);" data-kpi="openOrderCount">—</div>
+            <div class="kpi-card__sub">
+                합계금액 <span data-kpi="openOrderAmount" class="ms-1 fw-600">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 재고부족 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-card__label">
+                재고부족 품목
+                <i class="bi bi-exclamation-triangle-fill" style="color:var(--ms-danger)"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-danger);" data-kpi="lowStockCount">—</div>
+            <div class="kpi-card__sub">
+                <span class="text-danger"><i class="bi bi-dot"></i>즉시 발주 필요</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 설비가동률 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                설비 가동률
+                <i class="bi bi-cpu-fill" style="color:var(--ms-success)"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-success);" data-kpi="equipmentRate">—</div>
+            <div class="kpi-card__sub">
+                <span class="me-2"><i class="bi bi-circle-fill text-success" style="font-size:8px;"></i> 가동</span>
+                <span class="me-2"><i class="bi bi-circle-fill text-warning" style="font-size:8px;"></i> 점검</span>
+                <span><i class="bi bi-circle-fill text-danger" style="font-size:8px;"></i> 고장</span>
+            </div>
+            <div class="ms-progress mt-2">
+                <div class="ms-progress-bar" style="background:var(--ms-success);width:72%" id="kpiEqProgress"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 금주 불량률 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">
+                금주 불량률
+                <i class="bi bi-shield-exclamation" style="color:var(--ms-warning)"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-warning);" data-kpi="defectRate">—</div>
+            <div class="kpi-card__sub">
+                전주 대비 <span class="trend-down ms-1"><i class="bi bi-arrow-down-short"></i>0.12%p</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 작업지시 현황 -->
+    <div class="col-12 col-sm-6 col-xl-4">
+        <div class="kpi-card kpi-secondary">
+            <div class="kpi-card__label">
+                진행중 작업지시
+                <i class="bi bi-gear-fill" style="color:var(--ms-muted)"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-muted);" data-kpi="activeWorkOrders">—</div>
+            <div class="kpi-card__sub">
+                <span class="badge bg-secondary me-1">계획</span>
+                <span class="badge" style="background:var(--ms-info);">진행</span>
+                <span class="badge bg-success ms-1">완료</span>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /KPI row -->
+
+<!-- ──────────────────────────────────────────────────
+     차트 영역 (좌 8/12 라인차트 + 우 4/12 도넛)
+────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+
+    <!-- 생산실적 라인차트 -->
+    <div class="col-12 col-lg-8">
+        <div class="ms-card h-100">
+            <div class="ms-card__header">
+                <h2 class="ms-card__title"><i class="bi bi-graph-up me-2"></i>최근 7일 생산실적</h2>
+                <span class="text-muted-sm">생산수량 / 불량수량</span>
+            </div>
+            <div class="ms-card__body">
+                <div class="chart-container" style="height:280px;">
+                    <canvas id="chartProduction" aria-label="최근 7일 생산실적 차트" role="img"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 설비 현황 도넛차트 -->
+    <div class="col-12 col-lg-4">
+        <div class="ms-card h-100">
+            <div class="ms-card__header">
+                <h2 class="ms-card__title"><i class="bi bi-cpu me-2"></i>설비 현황</h2>
+                <span class="text-muted-sm">대수 기준</span>
+            </div>
+            <div class="ms-card__body">
+                <div class="chart-container" style="height:280px;">
+                    <canvas id="chartEquipment" aria-label="설비 상태 도넛 차트" role="img"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /Charts row -->
+
+<!-- ──────────────────────────────────────────────────
+     하단 영역 (좌 7/12 작업지시 테이블 + 우 5/12 재고부족)
+────────────────────────────────────────────────── -->
+<div class="row g-3">
+
+    <!-- 최근 작업지시 테이블 -->
+    <div class="col-12 col-lg-7">
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <h2 class="ms-card__title"><i class="bi bi-list-check me-2"></i>최근 작업지시</h2>
+                <a href="/WorkOrders" class="btn btn-sm btn-outline-primary" aria-label="작업지시 전체보기">
+                    전체보기 <i class="bi bi-arrow-right"></i>
+                </a>
+            </div>
+            <div class="ms-card__body p-0">
+                <div class="mes-table-wrapper">
+                    <table class="mes-table" aria-label="최근 작업지시 목록">
+                        <thead>
+                            <tr>
+                                <th scope="col">작업지시번호</th>
+                                <th scope="col">품목명</th>
+                                <th scope="col">수량</th>
+                                <th scope="col">상태</th>
+                                <th scope="col">등록일</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentWorkOrders">
+                            <tr>
+                                <td><a href="/WorkOrders" class="text-primary-ms fw-600">WO-2026-0520</a></td>
+                                <td>엔진 브래킷 A형</td>
+                                <td>500</td>
+                                <td><span class="ms-badge status-badge-inprogress">진행중</span></td>
+                                <td>2026-05-20</td>
+                            </tr>
+                            <tr>
+                                <td><a href="/WorkOrders" class="text-primary-ms fw-600">WO-2026-0519</a></td>
+                                <td>볼트 M12×40</td>
+                                <td>2,000</td>
+                                <td><span class="ms-badge status-badge-completed">완료</span></td>
+                                <td>2026-05-19</td>
+                            </tr>
+                            <tr>
+                                <td><a href="/WorkOrders" class="text-primary-ms fw-600">WO-2026-0518</a></td>
+                                <td>하우징 케이스 B</td>
+                                <td>300</td>
+                                <td><span class="ms-badge status-badge-planned">계획</span></td>
+                                <td>2026-05-18</td>
+                            </tr>
+                            <tr>
+                                <td><a href="/WorkOrders" class="text-primary-ms fw-600">WO-2026-0517</a></td>
+                                <td>샤프트 조립품</td>
+                                <td>150</td>
+                                <td><span class="ms-badge status-badge-inprogress">진행중</span></td>
+                                <td>2026-05-17</td>
+                            </tr>
+                            <tr>
+                                <td><a href="/WorkOrders" class="text-primary-ms fw-600">WO-2026-0516</a></td>
+                                <td>너트 M8 (아연도금)</td>
+                                <td>5,000</td>
+                                <td><span class="ms-badge status-badge-completed">완료</span></td>
+                                <td>2026-05-16</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 재고부족 알림 -->
+    <div class="col-12 col-lg-5">
+        <div class="ms-card">
+            <div class="ms-card__header" style="background:#fff0f0; border-bottom-color:#ffd0d0;">
+                <h2 class="ms-card__title" style="color:var(--ms-danger);">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>재고부족 알림
+                </h2>
+                <a href="/Inventory" class="btn btn-sm btn-outline-danger" aria-label="재고 전체보기">
+                    전체보기
+                </a>
+            </div>
+            <div class="ms-card__body p-0">
+                <ul class="list-group list-group-flush" id="lowStockList">
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                        <div>
+                            <div class="fw-600" style="font-size:13px;">볼트 M8×20</div>
+                            <div class="text-muted-sm mt-1">현재고: <strong class="text-danger">12</strong> / 안전재고: 100</div>
+                        </div>
+                        <span class="ms-badge status-badge-failed">소진위험</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                        <div>
+                            <div class="fw-600" style="font-size:13px;">패킹 O링 40φ</div>
+                            <div class="text-muted-sm mt-1">현재고: <strong class="text-warning">45</strong> / 안전재고: 200</div>
+                        </div>
+                        <span class="ms-badge status-badge-pending">부족</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                        <div>
+                            <div class="fw-600" style="font-size:13px;">구리 전선 1.5SQ</div>
+                            <div class="text-muted-sm mt-1">현재고: <strong class="text-danger">0</strong> / 안전재고: 50m</div>
+                        </div>
+                        <span class="ms-badge status-badge-failed">소진</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                        <div>
+                            <div class="fw-600" style="font-size:13px;">실리콘 씰런트</div>
+                            <div class="text-muted-sm mt-1">현재고: <strong class="text-warning">8</strong> / 안전재고: 30</div>
+                        </div>
+                        <span class="ms-badge status-badge-pending">부족</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-4 py-3">
+                        <div>
+                            <div class="fw-600" style="font-size:13px;">알루미늄 판재 3T</div>
+                            <div class="text-muted-sm mt-1">현재고: <strong class="text-danger">2</strong> / 안전재고: 20장</div>
+                        </div>
+                        <span class="ms-badge status-badge-failed">소진위험</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /Bottom row -->

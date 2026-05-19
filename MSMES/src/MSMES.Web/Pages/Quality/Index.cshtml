@@ -1,0 +1,52 @@
+@page
+@model MSMES.Web.Pages.Quality.IndexModel
+@{ ViewData["Title"] = "품질 관리"; }
+
+<h1>검사 목록</h1>
+
+<table style="margin-top:16px;">
+    <thead>
+        <tr>
+            <th>검사번호</th>
+            <th>LOT번호</th>
+            <th>검사항목</th>
+            <th>검사수량</th>
+            <th>불량수량</th>
+            <th>불량률(%)</th>
+            <th>검사자</th>
+            <th>검사일</th>
+            <th>결과</th>
+        </tr>
+    </thead>
+    <tbody>
+    @foreach (var insp in Model.Inspections)
+    {
+        var badge = insp.Result switch
+        {
+            MSMES.Domain.Quality.QualityStatus.Passed =>
+                "<span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>합격</span>",
+            MSMES.Domain.Quality.QualityStatus.Failed =>
+                "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>불합격</span>",
+            MSMES.Domain.Quality.QualityStatus.ConditionalPass =>
+                "<span style='background:#8e44ad;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>조건부합격</span>",
+            _ =>
+                "<span style='background:#f39c12;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>대기</span>"
+        };
+        <tr>
+            <td>@insp.InspectionNo</td>
+            <td>@insp.LotNo</td>
+            <td>@insp.InspectionItem</td>
+            <td style="text-align:right;">@insp.InspectedQuantity.ToString("N2")</td>
+            <td style="text-align:right;">@insp.DefectQuantity.ToString("N2")</td>
+            <td style="text-align:right;">@insp.DefectRate.ToString("N2")</td>
+            <td>@insp.Inspector</td>
+            <td>@insp.InspectionDate.ToString("yyyy-MM-dd")</td>
+            <td>@Html.Raw(badge)</td>
+        </tr>
+    }
+    @if (!Model.Inspections.Any())
+    {
+        <tr><td colspan="9" style="text-align:center; color:#aaa; padding:24px;">데이터가 없습니다.</td></tr>
+    }
+    </tbody>
+</table>

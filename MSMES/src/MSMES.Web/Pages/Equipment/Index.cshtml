@@ -1,0 +1,99 @@
+@page
+@model MSMES.Web.Pages.Equipment.IndexModel
+@{ ViewData["Title"] = "설비관리"; }
+
+<style>
+    .kpi-cards { display: flex; gap: 16px; margin-bottom: 24px; }
+    .kpi-card  { flex: 1; background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); text-align: center; }
+    .kpi-card .value { font-size: 2rem; font-weight: 700; }
+    .kpi-card .label { color: #666; font-size: 0.85rem; margin-top: 4px; }
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; }
+    .badge-running     { background: #d4edda; color: #155724; }
+    .badge-stopped     { background: #e2e3e5; color: #383d41; }
+    .badge-maintenance { background: #fff3cd; color: #856404; }
+    .badge-breakdown   { background: #f8d7da; color: #721c24; }
+    .alert-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px 16px; margin-bottom: 24px; border-radius: 4px; }
+</style>
+
+<h1>설비관리</h1>
+
+<!-- KPI 카드 -->
+<div class="kpi-cards">
+    <div class="kpi-card">
+        <div class="value" style="color:#27ae60;">@Model.RunningCount</div>
+        <div class="label">가동중</div>
+    </div>
+    <div class="kpi-card">
+        <div class="value" style="color:#f39c12;">@Model.MaintenanceCount</div>
+        <div class="label">점검중</div>
+    </div>
+    <div class="kpi-card">
+        <div class="value" style="color:#e74c3c;">@Model.BreakdownCount</div>
+        <div class="label">고장</div>
+    </div>
+</div>
+
+<!-- 점검 예정 알림 -->
+@if (Model.MaintenanceDue.Any())
+{
+    <div class="alert-box">
+        <strong>점검 예정 알림</strong> — 7일 이내 점검 예정 설비 @Model.MaintenanceDue.Count 건
+        <ul style="margin:8px 0 0; padding-left:20px;">
+            @foreach (var eq in Model.MaintenanceDue)
+            {
+                <li>
+                    <strong>@eq.EquipmentCode</strong> @eq.EquipmentName
+                    — 다음 점검일: @eq.NextInspectionDate?.ToString("yyyy-MM-dd")
+                </li>
+            }
+        </ul>
+    </div>
+}
+
+<!-- 설비 목록 -->
+<h2 style="margin-top:0;">설비 목록</h2>
+<table>
+    <thead>
+        <tr>
+            <th>설비코드</th>
+            <th>설비명</th>
+            <th>유형</th>
+            <th>위치</th>
+            <th>상태</th>
+            <th>마지막 점검일</th>
+            <th>다음 점검일</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var eq in Model.Equipments)
+        {
+            var badgeCss = eq.Status switch
+            {
+                MSMES.Domain.Equipment.EquipmentStatus.Running     => "badge-running",
+                MSMES.Domain.Equipment.EquipmentStatus.Maintenance => "badge-maintenance",
+                MSMES.Domain.Equipment.EquipmentStatus.Breakdown   => "badge-breakdown",
+                _                                                   => "badge-stopped"
+            };
+            var statusLabel = eq.Status switch
+            {
+                MSMES.Domain.Equipment.EquipmentStatus.Running     => "가동중",
+                MSMES.Domain.Equipment.EquipmentStatus.Maintenance => "점검중",
+                MSMES.Domain.Equipment.EquipmentStatus.Breakdown   => "고장",
+                _                                                   => "정지"
+            };
+            <tr>
+                <td>@eq.EquipmentCode</td>
+                <td>@eq.EquipmentName</td>
+                <td>@eq.EquipmentType</td>
+                <td>@eq.Location</td>
+                <td><span class="badge @badgeCss">@statusLabel</span></td>
+                <td>@eq.LastInspectionDate?.ToString("yyyy-MM-dd")</td>
+                <td>@eq.NextInspectionDate?.ToString("yyyy-MM-dd")</td>
+            </tr>
+        }
+        @if (!Model.Equipments.Any())
+        {
+            <tr><td colspan="7">등록된 설비가 없습니다.</td></tr>
+        }
+    </tbody>
+</table>

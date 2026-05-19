@@ -1,12 +1,442 @@
 @page
 @model MSMES.Web.Pages.WorkOrders.IndexModel
-@{ ViewData["Title"] = "작업지시 관리"; }
+@{
+    ViewData["Title"] = "작업지시";
+}
 
-<h1>작업지시 목록</h1>
-<a class="btn" href="#">신규 작업지시</a>
-<table style="margin-top:16px;">
-    <thead><tr><th>작업지시번호</th><th>수주번호</th><th>품목</th><th>계획수량</th><th>상태</th></tr></thead>
-    <tbody>
-        <tr><td colspan="5">데이터 없음 (목록 페이지 틀)</td></tr>
-    </tbody>
-</table>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-gear me-2 text-primary-ms"></i>작업지시</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active" aria-current="page">작업지시</li>
+            </ol>
+        </nav>
+    </div>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalWorkOrder"
+            onclick="openCreateWoModal()" aria-label="작업지시 등록">
+        <i class="bi bi-plus-lg me-1"></i>작업지시 등록
+    </button>
+</div>
+
+<!-- 검색 필터 카드 -->
+<div class="ms-filter-card">
+    <form id="woSearchForm" method="get" class="row g-2 align-items-end">
+        <div class="col-12 col-sm-6 col-md-3">
+            <label for="woFilterNo" class="form-label text-muted-sm mb-1">작업지시번호</label>
+            <input type="text" id="woFilterNo" name="woNo" class="form-control form-control-sm"
+                   placeholder="WO-2026-..." value="@Request.Query["woNo"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <label for="woFilterItem" class="form-label text-muted-sm mb-1">품목명</label>
+            <input type="text" id="woFilterItem" name="item" class="form-control form-control-sm"
+                   placeholder="품목명 검색" value="@Request.Query["item"]" />
+        </div>
+        <div class="col-12 col-sm-6 col-md-2">
+            <label for="woFilterStatus" class="form-label text-muted-sm mb-1">상태</label>
+            <select id="woFilterStatus" name="status" class="form-select form-select-sm">
+                <option value="">전체</option>
+                @{ var selWoStatus = Request.Query["status"].ToString(); }
+                <option value="Planned"    selected="@(selWoStatus == "Planned"    ? "selected" : null)">계획</option>
+                <option value="InProgress" selected="@(selWoStatus == "InProgress" ? "selected" : null)">진행중</option>
+                <option value="Completed"  selected="@(selWoStatus == "Completed"  ? "selected" : null)">완료</option>
+                <option value="Cancelled"  selected="@(selWoStatus == "Cancelled"  ? "selected" : null)">취소</option>
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-auto d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary" aria-label="검색">
+                <i class="bi bi-search me-1"></i>검색
+            </button>
+            <a href="/WorkOrders" class="btn btn-sm btn-outline-secondary" aria-label="초기화">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+            </a>
+        </div>
+    </form>
+</div>
+
+<!-- 테이블 카드 -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <h2 class="ms-card__title">작업지시 목록</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted-sm">
+                <span class="badge bg-secondary me-1">계획</span>
+                <span class="badge" style="background:var(--ms-info);">진행중</span>
+                <span class="badge bg-success ms-1">완료</span>
+            </span>
+        </div>
+    </div>
+    <div class="ms-card__body p-0">
+        <div class="mes-table-wrapper">
+            <table class="mes-table" aria-label="작업지시 목록 테이블">
+                <thead>
+                    <tr>
+                        <th scope="col">작업지시번호</th>
+                        <th scope="col">수주참조</th>
+                        <th scope="col">품목명</th>
+                        <th scope="col">계획수량</th>
+                        <th scope="col">시작일</th>
+                        <th scope="col">상태</th>
+                        <th scope="col">진행률</th>
+                        <th scope="col" style="width:90px;">액션</th>
+                    </tr>
+                </thead>
+                <tbody id="woTableBody">
+                    <!-- 샘플 데이터 (실제 데이터로 대체 필요) -->
+                    <tr>
+                        <td>
+                            <a href="#" class="text-primary-ms fw-600"
+                               onclick="openWoDetailModal('WO-2026-0520'); return false;">
+                                WO-2026-0520
+                            </a>
+                        </td>
+                        <td><span class="text-muted-sm">SO-2026-0312</span></td>
+                        <td>엔진 브래킷 A형</td>
+                        <td>500</td>
+                        <td>2026-05-20</td>
+                        <td><span class="ms-badge status-badge-inprogress">진행중</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="ms-progress flex-grow-1" style="min-width:80px;">
+                                    <div class="ms-progress-bar" style="background:var(--ms-info);width:62%;"></div>
+                                </div>
+                                <span class="text-muted-sm" style="white-space:nowrap;">62%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn-icon"
+                                        onclick="openWoEditModal('WO-2026-0520')"
+                                        aria-label="수정" title="수정">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn-icon btn-icon-danger"
+                                        onclick="confirmDeleteWo('WO-2026-0520')"
+                                        aria-label="삭제" title="삭제">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <a href="#" class="text-primary-ms fw-600"
+                               onclick="openWoDetailModal('WO-2026-0519'); return false;">
+                                WO-2026-0519
+                            </a>
+                        </td>
+                        <td><span class="text-muted-sm">SO-2026-0308</span></td>
+                        <td>볼트 M12×40</td>
+                        <td>2,000</td>
+                        <td>2026-05-19</td>
+                        <td><span class="ms-badge status-badge-completed">완료</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="ms-progress flex-grow-1" style="min-width:80px;">
+                                    <div class="ms-progress-bar" style="background:var(--ms-success);width:100%;"></div>
+                                </div>
+                                <span class="text-muted-sm" style="white-space:nowrap;">100%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn-icon"
+                                        onclick="openWoEditModal('WO-2026-0519')"
+                                        aria-label="수정" title="수정">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn-icon btn-icon-danger"
+                                        onclick="confirmDeleteWo('WO-2026-0519')"
+                                        aria-label="삭제" title="삭제">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <a href="#" class="text-primary-ms fw-600"
+                               onclick="openWoDetailModal('WO-2026-0518'); return false;">
+                                WO-2026-0518
+                            </a>
+                        </td>
+                        <td><span class="text-muted-sm">SO-2026-0305</span></td>
+                        <td>하우징 케이스 B</td>
+                        <td>300</td>
+                        <td>2026-05-18</td>
+                        <td><span class="ms-badge status-badge-planned">계획</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="ms-progress flex-grow-1" style="min-width:80px;">
+                                    <div class="ms-progress-bar" style="background:var(--ms-muted);width:0%;"></div>
+                                </div>
+                                <span class="text-muted-sm" style="white-space:nowrap;">0%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn-icon"
+                                        onclick="openWoEditModal('WO-2026-0518')"
+                                        aria-label="수정" title="수정">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn-icon btn-icon-danger"
+                                        onclick="confirmDeleteWo('WO-2026-0518')"
+                                        aria-label="삭제" title="삭제">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <a href="#" class="text-primary-ms fw-600"
+                               onclick="openWoDetailModal('WO-2026-0517'); return false;">
+                                WO-2026-0517
+                            </a>
+                        </td>
+                        <td><span class="text-muted-sm">SO-2026-0301</span></td>
+                        <td>샤프트 조립품</td>
+                        <td>150</td>
+                        <td>2026-05-17</td>
+                        <td><span class="ms-badge status-badge-inprogress">진행중</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="ms-progress flex-grow-1" style="min-width:80px;">
+                                    <div class="ms-progress-bar" style="background:var(--ms-info);width:35%;"></div>
+                                </div>
+                                <span class="text-muted-sm" style="white-space:nowrap;">35%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn-icon"
+                                        onclick="openWoEditModal('WO-2026-0517')"
+                                        aria-label="수정" title="수정">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn-icon btn-icon-danger"
+                                        onclick="confirmDeleteWo('WO-2026-0517')"
+                                        aria-label="삭제" title="삭제">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <a href="#" class="text-primary-ms fw-600"
+                               onclick="openWoDetailModal('WO-2026-0516'); return false;">
+                                WO-2026-0516
+                            </a>
+                        </td>
+                        <td><span class="text-muted-sm">SO-2026-0298</span></td>
+                        <td>너트 M8 (아연도금)</td>
+                        <td>5,000</td>
+                        <td>2026-05-16</td>
+                        <td><span class="ms-badge status-badge-completed">완료</span></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="ms-progress flex-grow-1" style="min-width:80px;">
+                                    <div class="ms-progress-bar" style="background:var(--ms-success);width:100%;"></div>
+                                </div>
+                                <span class="text-muted-sm" style="white-space:nowrap;">100%</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn-icon"
+                                        onclick="openWoEditModal('WO-2026-0516')"
+                                        aria-label="수정" title="수정">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn-icon btn-icon-danger"
+                                        onclick="confirmDeleteWo('WO-2026-0516')"
+                                        aria-label="삭제" title="삭제">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     작업지시 등록/수정 모달
+════════════════════════════════════════════ -->
+<div class="modal fade" id="modalWorkOrder" tabindex="-1"
+     aria-labelledby="modalWorkOrderLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalWorkOrderLabel">
+                    <i class="bi bi-gear me-2"></i>
+                    <span id="modalWorkOrderTitle">작업지시 등록</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formWorkOrder" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <input type="hidden" id="woId" name="id" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="woOrderNo" class="form-label">
+                                작업지시번호 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="woOrderNo" name="workOrderNo"
+                                   class="form-control" placeholder="WO-2026-XXXX" required />
+                            <div class="invalid-feedback">작업지시번호는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woSalesRef" class="form-label">수주참조번호</label>
+                            <input type="text" id="woSalesRef" name="salesOrderNo"
+                                   class="form-control" placeholder="SO-2026-XXXX" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woItemCode" class="form-label">
+                                품목코드 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="woItemCode" name="itemCode"
+                                   class="form-control" placeholder="ITEM-001" required />
+                            <div class="invalid-feedback">품목코드는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woItemName" class="form-label">품목명</label>
+                            <input type="text" id="woItemName" name="itemName"
+                                   class="form-control" placeholder="품목명" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woQty" class="form-label">
+                                계획수량 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="woQty" name="plannedQty"
+                                   class="form-control" placeholder="0" min="1" required />
+                            <div class="invalid-feedback">계획수량은 1 이상이어야 합니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woStartDate" class="form-label">
+                                시작일 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="woStartDate" name="startDate"
+                                   class="form-control" required />
+                            <div class="invalid-feedback">시작일은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woEndDate" class="form-label">완료예정일</label>
+                            <input type="date" id="woEndDate" name="endDate"
+                                   class="form-control" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woStatus2" class="form-label">상태</label>
+                            <select id="woStatus2" name="status" class="form-select">
+                                <option value="Planned">계획</option>
+                                <option value="InProgress">진행중</option>
+                                <option value="Completed">완료</option>
+                                <option value="Cancelled">취소</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woProgress" class="form-label">진행률 (%)</label>
+                            <div class="input-group">
+                                <input type="number" id="woProgress" name="progressRate"
+                                       class="form-control" placeholder="0" min="0" max="100" value="0" />
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label for="woNote" class="form-label">비고</label>
+                            <textarea id="woNote" name="note" class="form-control" rows="2"
+                                      placeholder="특이사항을 입력하세요"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        취소
+                    </button>
+                    <button type="submit" class="btn btn-primary" data-save aria-label="저장">
+                        <i class="bi bi-check-lg me-1"></i>저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    function openCreateWoModal() {
+        document.getElementById('modalWorkOrderTitle').textContent = '작업지시 등록';
+        document.getElementById('formWorkOrder').reset();
+        document.getElementById('formWorkOrder').classList.remove('was-validated');
+        document.getElementById('woProgress').value = '0';
+        var today = new Date().toISOString().slice(0, 10);
+        document.getElementById('woStartDate').value = today;
+    }
+
+    function openWoEditModal(woNo) {
+        document.getElementById('modalWorkOrderTitle').textContent = '작업지시 수정';
+        document.getElementById('formWorkOrder').classList.remove('was-validated');
+        document.getElementById('woOrderNo').value = woNo;
+        var modal = new bootstrap.Modal(document.getElementById('modalWorkOrder'));
+        modal.show();
+    }
+
+    function openWoDetailModal(woNo) {
+        openWoEditModal(woNo);
+    }
+
+    function confirmDeleteWo(woNo) {
+        if (confirm('"' + woNo + '" 작업지시를 삭제하시겠습니까?')) {
+            msFetch('/api/workorders/' + woNo, { method: 'DELETE' })
+                .then(function(res) {
+                    if (res.ok) {
+                        showToast('작업지시가 삭제되었습니다.', 'success');
+                        setTimeout(function() { location.reload(); }, 1000);
+                    } else {
+                        showToast('삭제 실패: 서버 오류', 'danger');
+                    }
+                })
+                .catch(function() {
+                    showToast('삭제 실패: 네트워크 오류', 'danger');
+                });
+        }
+    }
+
+    document.getElementById('formWorkOrder').addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!this.checkValidity()) {
+            this.classList.add('was-validated');
+            var firstInvalid = this.querySelector(':invalid');
+            if (firstInvalid) firstInvalid.focus();
+            return;
+        }
+        var data = Object.fromEntries(new FormData(this).entries());
+        var isEdit = !!data.id;
+        var url    = isEdit ? '/api/workorders/' + data.id : '/api/workorders';
+        var method = isEdit ? 'PUT' : 'POST';
+
+        msFetch(url, { method: method, body: JSON.stringify(data) })
+            .then(function(res) {
+                if (res.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('modalWorkOrder')).hide();
+                    showToast('작업지시가 ' + (isEdit ? '수정' : '등록') + '되었습니다.', 'success');
+                    setTimeout(function() { location.reload(); }, 1200);
+                } else {
+                    return res.json().then(function(err) {
+                        showToast('저장 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+                    });
+                }
+            })
+            .catch(function() {
+                showToast('저장 실패: 네트워크 오류', 'danger');
+            });
+    });
+</script>
+}

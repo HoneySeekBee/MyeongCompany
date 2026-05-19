@@ -1,0 +1,83 @@
+@page
+@model MSMES.Web.Pages.Process.IndexModel
+@{ ViewData["Title"] = "공정관리"; }
+
+<style>
+    .progress-bar-wrap { background: #e9ecef; border-radius: 4px; height: 14px; width: 200px; display: inline-block; vertical-align: middle; }
+    .progress-bar-fill { height: 100%; border-radius: 4px; background: #3498db; }
+    .progress-bar-fill.good  { background: #27ae60; }
+    .progress-bar-fill.warn  { background: #f39c12; }
+    .progress-bar-fill.bad   { background: #e74c3c; }
+</style>
+
+<h1>공정관리</h1>
+
+<!-- 공정 정의 -->
+<h2>공정 정의</h2>
+<table style="margin-bottom:32px;">
+    <thead>
+        <tr>
+            <th>공정코드</th>
+            <th>공정명</th>
+            <th>순서</th>
+            <th>표준 작업시간(분)</th>
+            <th>설비유형</th>
+            <th>활성</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var d in Model.Definitions)
+        {
+            <tr>
+                <td>@d.ProcessCode</td>
+                <td>@d.ProcessName</td>
+                <td>@d.ProcessOrder</td>
+                <td>@d.StandardTimeMinutes</td>
+                <td>@d.EquipmentType</td>
+                <td>@(d.IsActive ? "✔" : "✘")</td>
+            </tr>
+        }
+        @if (!Model.Definitions.Any())
+        {
+            <tr><td colspan="6">공정 정의가 없습니다.</td></tr>
+        }
+    </tbody>
+</table>
+
+<!-- 금일 생산실적 -->
+<h2>금일(@DateTime.Today.ToString("yyyy-MM-dd")) 공정별 생산실적</h2>
+<table>
+    <thead>
+        <tr>
+            <th>공정코드</th>
+            <th>공정명</th>
+            <th>생산수량</th>
+            <th>불량수량</th>
+            <th>불량률(%)</th>
+            <th>달성률</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var s in Model.DailySummary)
+        {
+            var fillCss = s.AchievementRate >= 90 ? "good" : s.AchievementRate >= 70 ? "warn" : "bad";
+            <tr>
+                <td>@s.ProcessCode</td>
+                <td>@s.ProcessName</td>
+                <td>@s.Produced.ToString("N0")</td>
+                <td>@s.Defect.ToString("N0")</td>
+                <td>@s.DefectRate %</td>
+                <td>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill @fillCss" style="width:@s.AchievementRate%;"></div>
+                    </div>
+                    <span style="margin-left:8px;">@s.AchievementRate %</span>
+                </td>
+            </tr>
+        }
+        @if (!Model.DailySummary.Any())
+        {
+            <tr><td colspan="6">금일 생산실적이 없습니다.</td></tr>
+        }
+    </tbody>
+</table>
