@@ -1,10 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Domain.Equipment;
 
 namespace MSMES.Web.Pages.Equipment;
 
-[Authorize]
 public class IndexModel : PageModel
 {
     private readonly IEquipmentRepository _repo;
