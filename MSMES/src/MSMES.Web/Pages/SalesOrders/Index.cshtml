@@ -1,0 +1,23 @@
+@page
+@model MSMES.Web.Pages.SalesOrders.IndexModel
+@{ ViewData["Title"] = "수주 관리"; }
+
+<h1>수주 목록</h1>
+<a class="btn" href="#">신규 수주</a>
+<table style="margin-top:16px;">
+    <thead>
+        <tr><th>수주번호</th><th>고객</th><th>수주일</th><th>납기일</th><th>상태</th></tr>
+    </thead>
+    <tbody>
+    @foreach (var s in Model.Orders)
+    {
+        <tr>
+            <td>@s.SalesOrderNo</td>
+            <td>@s.CustomerName</td>
+            <td>@s.OrderDate.ToString("yyyy-MM-dd")</td>
+            <td>@s.DueDate.ToString("yyyy-MM-dd")</td>
+            <td>@s.Status</td>
+        </tr>
+    }
+    </tbody>
+</table>

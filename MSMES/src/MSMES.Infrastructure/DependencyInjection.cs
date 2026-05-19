@@ -1,0 +1,40 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using MSMES.Application.Common;
+using MSMES.Domain.Common;
+using MSMES.Domain.LotManagement;
+using MSMES.Domain.PurchaseOrder;
+using MSMES.Domain.SalesOrder;
+using MSMES.Domain.Shipment;
+using MSMES.Domain.WorkOrder;
+using MSMES.Infrastructure.Auth;
+using MSMES.Infrastructure.Persistence;
+using MSMES.Infrastructure.Repositories;
+
+namespace MSMES.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddMsmesInfrastructure(this IServiceCollection services, IConfiguration config)
+    {
+        services.AddSingleton<ISqlConnectionFactory, SqlConnectionFactory>();
+
+        services.AddScoped<ISalesOrderRepository, SqlSalesOrderRepository>();
+        services.AddScoped<IPurchaseOrderRepository, SqlPurchaseOrderRepository>();
+        services.AddScoped<IWorkOrderRepository, SqlWorkOrderRepository>();
+        services.AddScoped<ILotRepository, SqlLotRepository>();
+        services.AddScoped<IShipmentRepository, SqlShipmentRepository>();
+        services.AddScoped<IUserRepository, SqlUserRepository>();
+        services.AddScoped<ICommonCodeRepository, SqlCommonCodeRepository>();
+
+        services.Configure<JwtOptions>(config.GetSection("Jwt"));
+        // Application.Common 인터페이스로 등록 (Application 레이어에서 주입 가능)
+        // JwtService/BCryptPasswordHasher는 Infrastructure.Auth alias 인터페이스를 구현하며,
+        // 이 alias 인터페이스는 Application.Common 인터페이스를 상속하므로
+        // Application.Common.IJwtService / IPasswordHasher 로도 resolve 됩니다.
+        services.AddSingleton<Application.Common.IJwtService, JwtService>();
+        services.AddSingleton<Application.Common.IPasswordHasher, BCryptPasswordHasher>();
+
+        return services;
+    }
+}
