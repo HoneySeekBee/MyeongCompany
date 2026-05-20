@@ -1,52 +1,663 @@
 @page
 @model MSMES.Web.Pages.Quality.IndexModel
+@using MSMES.Domain.Quality
 @{ ViewData["Title"] = "품질 관리"; }
 
-<h1>검사 목록</h1>
+@* ════════════════════════════════════════════
+   대기 알림 배너
+════════════════════════════════════════════ *@
+@if (Model.PendingCount > 0)
+{
+    <div class="alert alert-warning d-flex align-items-center gap-3 mb-4 py-3" id="pendingAlert" role="alert">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <span class="flex-grow-1">
+            검사 대기 중인 항목이 <strong>@(Model.PendingCount)건</strong> 있습니다.
+        </span>
+        <button type="button" class="btn btn-sm btn-warning fw-600"
+                onclick="applyPendingFilter()">
+            <i class="bi bi-funnel me-1"></i>바로보기
+        </button>
+    </div>
+}
 
-<table style="margin-top:16px;">
-    <thead>
-        <tr>
-            <th>검사번호</th>
-            <th>LOT번호</th>
-            <th>검사항목</th>
-            <th>검사수량</th>
-            <th>불량수량</th>
-            <th>불량률(%)</th>
-            <th>검사자</th>
-            <th>검사일</th>
-            <th>결과</th>
-        </tr>
-    </thead>
-    <tbody>
-    @foreach (var insp in Model.Inspections)
-    {
-        var badge = insp.Result switch
-        {
-            MSMES.Domain.Quality.QualityStatus.Passed =>
-                "<span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>합격</span>",
-            MSMES.Domain.Quality.QualityStatus.Failed =>
-                "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>불합격</span>",
-            MSMES.Domain.Quality.QualityStatus.ConditionalPass =>
-                "<span style='background:#8e44ad;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>조건부합격</span>",
-            _ =>
-                "<span style='background:#f39c12;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>대기</span>"
-        };
-        <tr>
-            <td>@insp.InspectionNo</td>
-            <td>@insp.LotNo</td>
-            <td>@insp.InspectionItem</td>
-            <td style="text-align:right;">@insp.InspectedQuantity.ToString("N2")</td>
-            <td style="text-align:right;">@insp.DefectQuantity.ToString("N2")</td>
-            <td style="text-align:right;">@insp.DefectRate.ToString("N2")</td>
-            <td>@insp.Inspector</td>
-            <td>@insp.InspectionDate.ToString("yyyy-MM-dd")</td>
-            <td>@Html.Raw(badge)</td>
-        </tr>
+@* ════════════════════════════════════════════
+   페이지 헤더
+════════════════════════════════════════════ *@
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>품질 검사 목록</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/" class="text-decoration-none">홈</a></li>
+                <li class="breadcrumb-item active">품질관리</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary"
+                data-bs-toggle="modal" data-bs-target="#modalRegister">
+            <i class="bi bi-plus-circle me-1"></i>검사 등록
+        </button>
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   KPI 카드 4개
+════════════════════════════════════════════ *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                전체 검사 건수
+                <i class="bi bi-clipboard-data"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-primary);">
+                @Model.TotalCount.ToString("N0")
+            </div>
+            <div class="kpi-card__sub">
+                <i class="bi bi-bar-chart-line me-1"></i>전체 검사 건
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                합격 건수
+                <i class="bi bi-patch-check"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-success);">
+                @Model.PassedCount.ToString("N0")
+            </div>
+            <div class="kpi-card__sub">
+                <i class="bi bi-percent me-1"></i>합격률
+                <span class="fw-600 ms-1" style="color:var(--ms-success);">@Model.PassRate%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-card__label">
+                불합격 건수
+                <i class="bi bi-x-circle"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-danger);">
+                @Model.FailedCount.ToString("N0")
+            </div>
+            <div class="kpi-card__sub">
+                <i class="bi bi-graph-down me-1"></i>품질 이상 건
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-warning" role="button" style="cursor:pointer;"
+             onclick="applyPendingFilter()" title="클릭하면 대기 항목만 필터링됩니다">
+            <div class="kpi-card__label">
+                검사 대기
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="kpi-card__value" style="color:#d39e00;">
+                @Model.PendingCount.ToString("N0")
+            </div>
+            <div class="kpi-card__sub">
+                <i class="bi bi-funnel me-1"></i>클릭하여 필터 적용
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   불량률 추이 라인 차트
+════════════════════════════════════════════ *@
+<div class="ms-card mb-4">
+    <div class="ms-card__header">
+        <span class="ms-card__title">
+            <i class="bi bi-graph-up-arrow me-1 text-danger"></i>불량률 추이 (최근 7일)
+        </span>
+    </div>
+    <div class="ms-card__body">
+        <div class="chart-container" style="height:220px;">
+            <canvas id="chartDefectTrend"></canvas>
+        </div>
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   검사 목록 필터
+════════════════════════════════════════════ *@
+<div class="ms-filter-card mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label text-muted-sm mb-1">검사번호</label>
+            <input type="text" id="fInspNo" class="form-control form-control-sm"
+                   placeholder="QI-" autocomplete="off" oninput="applyFilter()">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label text-muted-sm mb-1">LOT번호</label>
+            <input type="text" id="fLotNo" class="form-control form-control-sm"
+                   placeholder="LOT-" autocomplete="off" oninput="applyFilter()">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label text-muted-sm mb-1">상태</label>
+            <select id="fStatus" class="form-select form-select-sm" onchange="applyFilter()">
+                <option value="">전체</option>
+                <option value="합격">합격</option>
+                <option value="불합격">불합격</option>
+                <option value="조건부합격">조건부합격</option>
+                <option value="대기">대기</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label text-muted-sm mb-1">검사일 From</label>
+            <input type="date" id="fDateFrom" class="form-control form-control-sm" oninput="applyFilter()">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label text-muted-sm mb-1">검사일 To</label>
+            <input type="date" id="fDateTo" class="form-control form-control-sm" oninput="applyFilter()">
+        </div>
+        <div class="col-6 col-md-2 d-flex gap-2">
+            <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="applyFilter()">
+                <i class="bi bi-search me-1"></i>검색
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1" onclick="resetFilter()">
+                <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   검사 목록 테이블
+════════════════════════════════════════════ *@
+<div class="ms-card">
+    <div class="ms-card__header">
+        <span class="ms-card__title">
+            <i class="bi bi-table me-1"></i>검사 목록
+            <span class="badge bg-secondary ms-2 fw-normal" id="visibleCount">@Model.Inspections.Count</span>
+        </span>
+        <div class="d-flex gap-2 align-items-center">
+            <span class="text-muted-sm" id="selectedInfo" style="display:none;"></span>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btnBulkDelete"
+                    style="display:none;" onclick="bulkDelete()">
+                <i class="bi bi-trash me-1"></i>선택 삭제
+            </button>
+        </div>
+    </div>
+    <div class="mes-table-wrapper">
+        <table class="mes-table table table-hover mb-0" id="inspTable">
+            <thead>
+                <tr>
+                    <th style="width:40px;">
+                        <input type="checkbox" class="form-check-input" id="chkAll"
+                               onclick="toggleAllCheck(this)">
+                    </th>
+                    <th>검사번호</th>
+                    <th>LOT번호</th>
+                    <th>검사항목</th>
+                    <th class="text-end">검사수량</th>
+                    <th class="text-end">불량수량</th>
+                    <th style="min-width:140px;">불량률</th>
+                    <th>검사자</th>
+                    <th>검사일</th>
+                    <th>결과</th>
+                    <th style="width:100px;">액션</th>
+                </tr>
+            </thead>
+            <tbody id="inspTableBody">
+            @foreach (var insp in Model.Inspections)
+            {
+                var (badgeClass, badgeLabel, statusText) = insp.Result switch
+                {
+                    QualityStatus.Passed          => ("bg-success",   "합격",    "합격"),
+                    QualityStatus.Failed          => ("bg-danger",    "불합격",  "불합격"),
+                    QualityStatus.ConditionalPass => ("badge-purple", "조건부합격", "조건부합격"),
+                    _                             => ("bg-warning text-dark", "대기", "대기")
+                };
+
+                var defectRate = insp.DefectRate;
+                var barClass = defectRate < 5m ? "bg-success"
+                             : defectRate < 10m ? "bg-warning"
+                             : "bg-danger";
+
+                <tr data-inspno="@insp.InspectionNo"
+                    data-lotno="@insp.LotNo"
+                    data-status="@statusText"
+                    data-date="@insp.InspectionDate.ToString("yyyy-MM-dd")">
+                    <td>
+                        <input type="checkbox" class="form-check-input row-check"
+                               value="@insp.InspectionNo" onchange="updateSelection()">
+                    </td>
+                    <td class="fw-600 text-primary-ms">@insp.InspectionNo</td>
+                    <td>@insp.LotNo</td>
+                    <td>@insp.InspectionItem</td>
+                    <td class="text-end">@insp.InspectedQuantity.ToString("N0")</td>
+                    <td class="text-end">@insp.DefectQuantity.ToString("N0")</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted-sm" style="min-width:42px;">@defectRate.ToString("N1")%</span>
+                            <div class="flex-grow-1 ms-progress">
+                                <div class="ms-progress-bar @barClass"
+                                     style="width:@Math.Min(defectRate, 100m).ToString("N1", System.Globalization.CultureInfo.InvariantCulture)%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>@insp.Inspector</td>
+                    <td>@insp.InspectionDate.ToString("yyyy-MM-dd")</td>
+                    <td>
+                        <span class="ms-badge @badgeClass">@badgeLabel</span>
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            <button type="button" class="btn-icon" title="상세"
+                                    onclick="viewDetail('@insp.InspectionNo')">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button type="button" class="btn-icon" title="결과수정"
+                                    onclick="openEditModal('@insp.InspectionNo', '@((int)insp.Result)')">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Inspections.Any())
+            {
+                <tr id="emptyRow">
+                    <td colspan="11" class="text-center py-5 text-muted-sm">
+                        <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+                        데이터가 없습니다.
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+    <div id="noResultRow" class="text-center py-5 text-muted-sm" style="display:none;">
+        <i class="bi bi-search fs-3 d-block mb-2 opacity-50"></i>
+        검색 결과가 없습니다.
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   검사 등록 Modal
+════════════════════════════════════════════ *@
+<div class="modal fade" id="modalRegister" tabindex="-1"
+     aria-labelledby="modalRegisterLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-600" id="modalRegisterLabel">
+                    <i class="bi bi-plus-circle me-2 text-primary"></i>검사 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formRegister" class="needs-validation" novalidate>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regLotNo">
+                                LOT번호 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="regLotNo" class="form-control"
+                                   placeholder="LOT-XXXXXX" required>
+                            <div class="invalid-feedback">LOT번호를 입력하세요.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regItem">
+                                검사항목 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="regItem" class="form-control"
+                                   placeholder="외관검사, 치수검사..." required>
+                            <div class="invalid-feedback">검사항목을 입력하세요.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="regInspQty">
+                                검사수량 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="regInspQty" class="form-control"
+                                   min="1" step="1" placeholder="0" required oninput="calcDefectRate()">
+                            <div class="invalid-feedback">검사수량을 입력하세요.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="regDefQty">불량수량</label>
+                            <input type="number" id="regDefQty" class="form-control"
+                                   min="0" step="1" value="0" oninput="calcDefectRate()">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-600">불량률 (자동계산)</label>
+                            <div class="form-control bg-light text-center fw-600" id="previewDefectRate">-</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regDefectType">불량유형</label>
+                            <select id="regDefectType" class="form-select">
+                                <option value="">선택 없음</option>
+                                @foreach (var dt in Model.DefectTypes)
+                                {
+                                    <option value="@dt.DefectTypeCode">
+                                        [@dt.DefectTypeCode] @dt.DefectTypeName
+                                    </option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regDate">
+                                검사일 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="regDate" class="form-control" required
+                                   value="@DateTime.Now.ToString("yyyy-MM-dd")">
+                            <div class="invalid-feedback">검사일을 입력하세요.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regInspector">
+                                검사자 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="regInspector" class="form-control"
+                                   placeholder="담당자명" required>
+                            <div class="invalid-feedback">검사자를 입력하세요.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="regResult">결과</label>
+                            <select id="regResult" class="form-select">
+                                <option value="0">대기</option>
+                                <option value="1">합격</option>
+                                <option value="2">불합격</option>
+                                <option value="3">조건부합격</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-600" for="regRemarks">비고</label>
+                            <textarea id="regRemarks" class="form-control" rows="2"
+                                      placeholder="상세내용 입력..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" data-save onclick="saveInspection()">
+                    <i class="bi bi-save me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ════════════════════════════════════════════
+   결과 수정 Modal
+════════════════════════════════════════════ *@
+<div class="modal fade" id="modalEdit" tabindex="-1"
+     aria-labelledby="modalEditLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title fw-600" id="modalEditLabel">
+                    <i class="bi bi-pencil-square me-2 text-warning"></i>결과 수정
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted-sm mb-3">
+                    검사번호: <strong id="editInspNo"></strong>
+                </p>
+                <div class="mb-3">
+                    <label class="form-label fw-600">결과 변경</label>
+                    <select id="editResult" class="form-select">
+                        <option value="0">대기</option>
+                        <option value="1">합격</option>
+                        <option value="2">불합격</option>
+                        <option value="3">조건부합격</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-warning" data-save onclick="saveEdit()">
+                    <i class="bi bi-save me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+<style>
+    .badge-purple { background-color: #7c3aed; color: #fff; }
+    .ms-progress-bar.bg-success  { background-color: var(--ms-success) !important; }
+    .ms-progress-bar.bg-warning  { background-color: var(--ms-warning) !important; }
+    .ms-progress-bar.bg-danger   { background-color: var(--ms-danger)  !important; }
+</style>
+}
+
+@section Scripts {
+<script>
+(function initDefectTrendChart() {
+    var ctx = document.getElementById('chartDefectTrend');
+    if (!ctx) return;
+
+    var labels = @Html.Raw(
+        "[" + string.Join(",", Model.DefectTrend.Select(t => $"'{t.Date}'")) + "]"
+    );
+    var data = @Html.Raw(
+        "[" + string.Join(",", Model.DefectTrend.Select(t => t.DefectRate.ToString(System.Globalization.CultureInfo.InvariantCulture))) + "]"
+    );
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: '불량률(%)',
+                data: data,
+                borderColor: '#dc3545',
+                backgroundColor: 'rgba(220,53,69,0.08)',
+                borderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                pointBackgroundColor: '#dc3545',
+                fill: true,
+                tension: 0.35
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return '불량률: ' + ctx.parsed.y.toFixed(2) + '%';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 12, family: 'Noto Sans KR' } } },
+                y: {
+                    beginAtZero: true,
+                    grid: { color: 'rgba(0,0,0,0.04)' },
+                    ticks: { font: { size: 12 }, callback: function(v) { return v + '%'; } }
+                }
+            }
+        }
+    });
+})();
+
+function applyFilter() {
+    var inspNo   = (document.getElementById('fInspNo').value   || '').trim().toLowerCase();
+    var lotNo    = (document.getElementById('fLotNo').value    || '').trim().toLowerCase();
+    var status   = (document.getElementById('fStatus').value   || '').trim();
+    var dateFrom = document.getElementById('fDateFrom').value  || '';
+    var dateTo   = document.getElementById('fDateTo').value    || '';
+    var rows     = document.querySelectorAll('#inspTableBody tr[data-inspno]');
+    var visible  = 0;
+
+    rows.forEach(function(row) {
+        var rInspNo = (row.getAttribute('data-inspno') || '').toLowerCase();
+        var rLotNo  = (row.getAttribute('data-lotno')  || '').toLowerCase();
+        var rStatus = (row.getAttribute('data-status') || '');
+        var rDate   = (row.getAttribute('data-date')   || '');
+        var ok = true;
+        if (inspNo   && rInspNo.indexOf(inspNo) < 0) ok = false;
+        if (lotNo    && rLotNo.indexOf(lotNo)   < 0) ok = false;
+        if (status   && rStatus !== status)           ok = false;
+        if (dateFrom && rDate < dateFrom)             ok = false;
+        if (dateTo   && rDate > dateTo)               ok = false;
+        row.style.display = ok ? '' : 'none';
+        if (ok) visible++;
+    });
+
+    document.getElementById('visibleCount').textContent = visible;
+    var noResult = document.getElementById('noResultRow');
+    if (noResult) noResult.style.display = visible === 0 ? '' : 'none';
+}
+
+function resetFilter() {
+    ['fInspNo','fLotNo'].forEach(function(id) { document.getElementById(id).value = ''; });
+    document.getElementById('fStatus').value   = '';
+    document.getElementById('fDateFrom').value = '';
+    document.getElementById('fDateTo').value   = '';
+    applyFilter();
+}
+
+function applyPendingFilter() {
+    resetFilter();
+    document.getElementById('fStatus').value = '대기';
+    applyFilter();
+    document.getElementById('inspTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleAllCheck(master) {
+    document.querySelectorAll('.row-check').forEach(function(cb) { cb.checked = master.checked; });
+    updateSelection();
+}
+
+function updateSelection() {
+    var checked = document.querySelectorAll('.row-check:checked');
+    var info    = document.getElementById('selectedInfo');
+    var delBtn  = document.getElementById('btnBulkDelete');
+    if (checked.length > 0) {
+        info.textContent    = checked.length + '건 선택됨';
+        info.style.display  = '';
+        delBtn.style.display = '';
+    } else {
+        info.style.display   = 'none';
+        delBtn.style.display = 'none';
     }
-    @if (!Model.Inspections.Any())
-    {
-        <tr><td colspan="9" style="text-align:center; color:#aaa; padding:24px;">데이터가 없습니다.</td></tr>
+}
+
+function bulkDelete() {
+    var checked = Array.from(document.querySelectorAll('.row-check:checked'));
+    if (checked.length === 0) return;
+    if (!confirm(checked.length + '건을 삭제하시겠습니까?')) return;
+    showToast('일괄 삭제 기능은 이후 버전에 추가 예정입니다.', 'warning');
+}
+
+function calcDefectRate() {
+    var inspQty = parseFloat(document.getElementById('regInspQty').value) || 0;
+    var defQty  = parseFloat(document.getElementById('regDefQty').value)  || 0;
+    var preview = document.getElementById('previewDefectRate');
+    if (inspQty > 0) {
+        var rate = (defQty / inspQty * 100).toFixed(2);
+        preview.textContent = rate + '%';
+        preview.style.color = rate < 5 ? '#28a745' : rate < 10 ? '#d39e00' : '#dc3545';
+    } else {
+        preview.textContent = '-';
+        preview.style.color = '';
     }
-    </tbody>
-</table>
+}
+
+function saveInspection() {
+    var form = document.getElementById('formRegister');
+    form.classList.add('was-validated');
+    if (!form.checkValidity()) return;
+
+    var inspQty = parseFloat(document.getElementById('regInspQty').value) || 0;
+    var defQty  = parseFloat(document.getElementById('regDefQty').value)  || 0;
+    if (defQty > inspQty) {
+        showToast('불량수량은 검사수량보다 클 수 없습니다.', 'danger');
+        return;
+    }
+
+    var payload = {
+        LotNo:             document.getElementById('regLotNo').value.trim(),
+        InspectionItem:    document.getElementById('regItem').value.trim(),
+        InspectedQuantity: inspQty,
+        DefectQuantity:    defQty,
+        DefectTypeCode:    document.getElementById('regDefectType').value || null,
+        Result:            parseInt(document.getElementById('regResult').value, 10),
+        Inspector:         document.getElementById('regInspector').value.trim(),
+        Remarks:           document.getElementById('regRemarks').value.trim() || null,
+        CreatedBy:         '@(User.Identity?.Name ?? "system")'
+    };
+
+    var saveBtn = document.querySelector('#modalRegister [data-save]');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중..';
+
+    msFetch('/api/quality/inspections', { method: 'POST', body: JSON.stringify(payload) })
+    .then(function(res) {
+        if (!res.ok) throw new Error('서버 오류: ' + res.status);
+        return res.json();
+    })
+    .then(function(data) {
+        bootstrap.Modal.getInstance(document.getElementById('modalRegister')).hide();
+        showToast('검사 등록 완료 (' + data.inspectionNo + ')', 'success');
+        setTimeout(function() { location.reload(); }, 1200);
+    })
+    .catch(function(err) { showToast('오류: ' + err.message, 'danger'); })
+    .finally(function() {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-save me-1"></i>저장';
+    });
+}
+
+var _editInspNo = '';
+
+function openEditModal(inspNo, currentResult) {
+    _editInspNo = inspNo;
+    document.getElementById('editInspNo').textContent = inspNo;
+    document.getElementById('editResult').value = String(currentResult);
+    new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
+
+function saveEdit() {
+    var newResult = parseInt(document.getElementById('editResult').value, 10);
+    var saveBtn   = document.querySelector('#modalEdit [data-save]');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중..';
+
+    msFetch('/api/quality/inspections/' + _editInspNo + '/result', {
+        method: 'PATCH',
+        body: JSON.stringify({ result: newResult })
+    })
+    .then(function(res) {
+        if (res.status === 404) throw new Error('해당 검사 항목을 찾을 수 없습니다.');
+        if (!res.ok) throw new Error('수정 실패: ' + res.status);
+        bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+        showToast('결과가 수정되었습니다.', 'success');
+        setTimeout(function() { location.reload(); }, 1200);
+    })
+    .catch(function(err) { showToast('오류: ' + err.message, 'danger'); })
+    .finally(function() {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-save me-1"></i>저장';
+    });
+}
+
+function viewDetail(inspNo) {
+    window.location.href = '/Quality/' + encodeURIComponent(inspNo);
+}
+
+document.getElementById('modalRegister').addEventListener('hidden.bs.modal', function() {
+    var form = document.getElementById('formRegister');
+    form.reset();
+    form.classList.remove('was-validated');
+    document.getElementById('previewDefectRate').textContent = '-';
+    document.getElementById('regDate').value = new Date().toISOString().slice(0, 10);
+});
+</script>
+}

@@ -1,67 +1,784 @@
 @page
 @model MSMES.Web.Pages.Inventory.IndexModel
+@using MSMES.Domain.Inventory
 @{ ViewData["Title"] = "재고 관리"; }
 
-<h1>재고 현황</h1>
-
-<div style="display:flex; gap:16px; margin-bottom:20px;">
-    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #3498db; box-shadow:0 1px 4px rgba(0,0,0,.08);">
-        <div style="font-size:12px; color:#888;">전체 품목수</div>
-        <div style="font-size:28px; font-weight:700; color:#2c3e50;">@Model.TotalCount</div>
-    </div>
-    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #e67e22; box-shadow:0 1px 4px rgba(0,0,0,.08);">
-        <div style="font-size:12px; color:#888;">부족재고 건수</div>
-        <div style="font-size:28px; font-weight:700; color:#e67e22;">@Model.LowStockCount</div>
-    </div>
-    <div style="flex:1; background:#fff; border-radius:8px; padding:16px 20px; border-left:4px solid #e74c3c; box-shadow:0 1px 4px rgba(0,0,0,.08);">
-        <div style="font-size:12px; color:#888;">소진(재고 없음)</div>
-        <div style="font-size:28px; font-weight:700; color:#e74c3c;">@Model.OutOfStockCount</div>
+<!-- ════════════════════════════════════════════
+     페이지 헤더
+════════════════════════════════════════════ -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>재고 관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/" class="text-decoration-none">홈</a></li>
+                <li class="breadcrumb-item active" aria-current="page">재고 관리</li>
+            </ol>
+        </nav>
     </div>
 </div>
 
-<table style="margin-top:8px;">
-    <thead>
-        <tr>
-            <th>품목코드</th>
-            <th>품목명</th>
-            <th>창고</th>
-            <th>현재재고</th>
-            <th>안전재고</th>
-            <th>단위</th>
-            <th>상태</th>
-        </tr>
-    </thead>
-    <tbody>
-    @foreach (var inv in Model.Inventories)
-    {
-        var rowStyle = inv.Status switch
-        {
-            MSMES.Domain.Inventory.InventoryStatus.OutOfStock => "background:#fdecea;",
-            MSMES.Domain.Inventory.InventoryStatus.LowStock   => "background:#fff3e0;",
-            _                                                  => ""
-        };
-        var badge = inv.Status switch
-        {
-            MSMES.Domain.Inventory.InventoryStatus.OutOfStock =>
-                "<span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>소진</span>",
-            MSMES.Domain.Inventory.InventoryStatus.LowStock =>
-                "<span style='background:#e67e22;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>부족</span>",
-            _ =>
-                "<span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:12px;font-size:12px;'>정상</span>"
-        };
-        <tr style="@rowStyle">
-            <td>@inv.ItemCode</td>
-            <td>@inv.ItemName</td>
-            <td>@inv.WarehouseCode</td>
-            <td style="text-align:right;">@inv.CurrentStock.ToString("N2")</td>
-            <td style="text-align:right;">@inv.SafetyStock.ToString("N2")</td>
-            <td>@inv.Unit</td>
-            <td>@Html.Raw(badge)</td>
-        </tr>
+<!-- ════════════════════════════════════════════
+     KPI 카드 4개
+════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                전체 품목 수
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-primary);">@Model.TotalCount</div>
+            <div class="kpi-card__sub">등록된 전체 재고 품목</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                정상 재고
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-success);">@Model.NormalCount</div>
+            <div class="kpi-card__sub">안전재고 이상</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-warning" id="kpiLowStock" style="cursor:pointer;" title="부족 재고 필터">
+            <div class="kpi-card__label">
+                부족 재고
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <div class="kpi-card__value" style="color:#e67e22;">@Model.LowStockCount</div>
+            <div class="kpi-card__sub">안전재고 미만 <i class="bi bi-funnel-fill ms-1 text-warning"></i></div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-danger" id="kpiOutOfStock" style="cursor:pointer;" title="소진 재고 필터">
+            <div class="kpi-card__label">
+                소진 품목
+                <i class="bi bi-x-circle"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-danger);">@Model.OutOfStockCount</div>
+            <div class="kpi-card__sub">재고 0 이하 <i class="bi bi-funnel-fill ms-1 text-danger"></i></div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     차트 + 알림 패널
+════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <!-- 도넛 차트 -->
+    <div class="col-lg-4">
+        <div class="ms-card h-100">
+            <div class="ms-card__header">
+                <span class="ms-card__title"><i class="bi bi-pie-chart me-1"></i>재고 현황 비율</span>
+            </div>
+            <div class="ms-card__body d-flex flex-column align-items-center">
+                <div class="chart-container" style="width:220px;height:220px;">
+                    <canvas id="chartInventory"></canvas>
+                </div>
+                <div class="d-flex gap-3 mt-3 flex-wrap justify-content-center">
+                    <span class="d-flex align-items-center gap-1" style="font-size:12px;">
+                        <span class="rounded-circle d-inline-block" style="width:10px;height:10px;background:#28a745;"></span>
+                        정상 @Model.NormalCount
+                    </span>
+                    <span class="d-flex align-items-center gap-1" style="font-size:12px;">
+                        <span class="rounded-circle d-inline-block" style="width:10px;height:10px;background:#ffc107;"></span>
+                        부족 @Model.LowStockCount
+                    </span>
+                    <span class="d-flex align-items-center gap-1" style="font-size:12px;">
+                        <span class="rounded-circle d-inline-block" style="width:10px;height:10px;background:#dc3545;"></span>
+                        소진 @Model.OutOfStockCount
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 부족/소진 알림 리스트 -->
+    <div class="col-lg-8">
+        <div class="ms-card h-100">
+            <div class="ms-card__header">
+                <span class="ms-card__title"><i class="bi bi-bell-fill text-danger me-1"></i>재고 부족 알림</span>
+                <span class="badge bg-danger rounded-pill">@Model.LowStockItems.Count</span>
+            </div>
+            <div class="ms-card__body p-0" style="max-height:260px;overflow-y:auto;">
+                @if (Model.LowStockItems.Any())
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var item in Model.LowStockItems.OrderByDescending(i => i.Status).ThenBy(i => i.ItemCode))
+                        {
+                            var isOut = item.Status == InventoryStatus.OutOfStock;
+                            var iconClass = isOut ? "bi-x-circle-fill text-danger" : "bi-exclamation-circle-fill text-warning";
+                            var textClass = isOut ? "text-danger" : "text-warning";
+                            var ratio = item.SafetyStock > 0
+                                ? Math.Min(100m, Math.Round(item.CurrentStock / item.SafetyStock * 100m, 1))
+                                : 0m;
+                            <li class="list-group-item py-2 px-3 d-flex align-items-center gap-2">
+                                <i class="bi @iconClass fs-5"></i>
+                                <div class="flex-grow-1 min-w-0">
+                                    <div class="d-flex justify-content-between align-items-baseline">
+                                        <span class="fw-600 text-truncate me-2">@item.ItemName</span>
+                                        <small class="text-muted-sm flex-shrink-0">@item.ItemCode</small>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 mt-1">
+                                        <div class="ms-progress flex-grow-1" style="height:5px;">
+                                            <div class="ms-progress-bar @(isOut ? "bg-danger" : "bg-warning")"
+                                                 style="width:@(ratio.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                                        </div>
+                                        <small class="@textClass flex-shrink-0" style="font-size:11px;">
+                                            @item.CurrentStock.ToString("N0") / @item.SafetyStock.ToString("N0") @item.Unit
+                                        </small>
+                                    </div>
+                                </div>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="text-center py-4 text-muted-sm">
+                        <i class="bi bi-check-circle fs-3 text-success d-block mb-2"></i>
+                        부족/소진 품목이 없습니다.
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     탭 구조
+════════════════════════════════════════════ -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <ul class="nav nav-tabs card-header-tabs" id="inventoryTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-stock" data-bs-toggle="tab"
+                        data-bs-target="#pane-stock" type="button" role="tab"
+                        aria-controls="pane-stock" aria-selected="true">
+                    <i class="bi bi-box-seam me-1"></i>재고 현황
+                    <span class="badge bg-secondary ms-1">@Model.TotalCount</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-history" data-bs-toggle="tab"
+                        data-bs-target="#pane-history" type="button" role="tab"
+                        aria-controls="pane-history" aria-selected="false">
+                    <i class="bi bi-arrow-left-right me-1"></i>입출고 이력
+                    <span class="badge bg-secondary ms-1">@Model.Transactions.Count</span>
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="tab-content" id="inventoryTabContent">
+
+        <!-- ── 탭 1: 재고 현황 ────────────────────── -->
+        <div class="tab-pane fade show active" id="pane-stock" role="tabpanel" aria-labelledby="tab-stock">
+            <!-- 검색 필터 -->
+            <div class="ms-filter-card m-3 mb-0">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-sm-6 col-md-4">
+                        <label class="form-label mb-1 text-muted-sm">품목코드 / 품목명</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="stockSearch" class="form-control"
+                                   placeholder="코드 또는 명칭 검색..." autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 text-muted-sm">창고</label>
+                        <select id="stockWarehouse" class="form-select form-select-sm">
+                            <option value="">전체 창고</option>
+                            @foreach (var wh in Model.Inventories.Select(i => i.WarehouseCode).Distinct().OrderBy(x => x))
+                            {
+                                <option value="@wh">@wh</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 text-muted-sm">상태</label>
+                        <select id="stockStatus" class="form-select form-select-sm">
+                            <option value="">전체 상태</option>
+                            <option value="Normal">정상</option>
+                            <option value="LowStock">부족</option>
+                            <option value="OutOfStock">소진</option>
+                        </select>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-2 d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btnStockReset">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 테이블 -->
+            <div class="mes-table-wrapper p-3">
+                <table class="mes-table" id="stockTable">
+                    <thead>
+                        <tr>
+                            <th>품목코드</th>
+                            <th>품목명</th>
+                            <th>창고</th>
+                            <th class="text-end">현재재고</th>
+                            <th class="text-end">안전재고</th>
+                            <th>단위</th>
+                            <th style="min-width:120px;">재고비율</th>
+                            <th>상태</th>
+                            <th class="text-center">액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTbody">
+                    @foreach (var inv in Model.Inventories)
+                    {
+                        var ratio = inv.SafetyStock > 0
+                            ? Math.Min(100m, Math.Round(inv.CurrentStock / inv.SafetyStock * 100m, 1))
+                            : 100m;
+                        var barColor = ratio >= 100m ? "bg-success"
+                            : ratio >= 50m ? "bg-warning"
+                            : "bg-danger";
+                        var rowClass = inv.Status switch
+                        {
+                            InventoryStatus.OutOfStock => "table-danger",
+                            InventoryStatus.LowStock   => "table-warning",
+                            _                          => ""
+                        };
+                        var statusBadge = inv.Status switch
+                        {
+                            InventoryStatus.OutOfStock =>
+                                "<span class=\"ms-badge status-badge-cancelled\">소진</span>",
+                            InventoryStatus.LowStock =>
+                                "<span class=\"ms-badge\" style=\"background:#e67e22;color:#fff;\">부족</span>",
+                            _ =>
+                                "<span class=\"ms-badge status-badge-completed\">정상</span>"
+                        };
+                        var statusVal = inv.Status.ToString();
+                        <tr class="stock-row @rowClass"
+                            data-code="@inv.ItemCode.ToLower()"
+                            data-name="@inv.ItemName.ToLower()"
+                            data-warehouse="@inv.WarehouseCode"
+                            data-status="@statusVal">
+                            <td class="fw-600 text-primary-ms">@inv.ItemCode</td>
+                            <td>@inv.ItemName</td>
+                            <td>
+                                <span class="ms-badge" style="background:#e8f0fe;color:#1a73e8;">@inv.WarehouseCode</span>
+                            </td>
+                            <td class="text-end fw-600">@inv.CurrentStock.ToString("N2")</td>
+                            <td class="text-end text-muted-sm">@inv.SafetyStock.ToString("N2")</td>
+                            <td>@inv.Unit</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="ms-progress flex-grow-1">
+                                        <div class="ms-progress-bar @barColor"
+                                             style="width:@(ratio.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                                    </div>
+                                    <small class="text-muted-sm flex-shrink-0" style="min-width:36px;text-align:right;">
+                                        @(ratio.ToString("F0"))%
+                                    </small>
+                                </div>
+                            </td>
+                            <td>@Html.Raw(statusBadge)</td>
+                            <td class="text-center">
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <button type="button" class="btn btn-sm btn-success py-0 px-2 btn-tx"
+                                            data-tx-type="Receipt"
+                                            data-item-code="@inv.ItemCode"
+                                            data-item-name="@inv.ItemName"
+                                            data-warehouse="@inv.WarehouseCode"
+                                            data-current-stock="@inv.CurrentStock"
+                                            data-unit="@inv.Unit"
+                                            title="입고">
+                                        <i class="bi bi-box-arrow-in-down"></i> 입고
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-primary py-0 px-2 btn-tx"
+                                            data-tx-type="Issue"
+                                            data-item-code="@inv.ItemCode"
+                                            data-item-name="@inv.ItemName"
+                                            data-warehouse="@inv.WarehouseCode"
+                                            data-current-stock="@inv.CurrentStock"
+                                            data-unit="@inv.Unit"
+                                            title="출고">
+                                        <i class="bi bi-box-arrow-up"></i> 출고
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary py-0 px-2 btn-tx"
+                                            data-tx-type="Adjustment"
+                                            data-item-code="@inv.ItemCode"
+                                            data-item-name="@inv.ItemName"
+                                            data-warehouse="@inv.WarehouseCode"
+                                            data-current-stock="@inv.CurrentStock"
+                                            data-unit="@inv.Unit"
+                                            title="조정">
+                                        <i class="bi bi-sliders"></i> 조정
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Inventories.Any())
+                    {
+                        <tr id="stockEmpty">
+                            <td colspan="9" class="text-center py-4 text-muted-sm">
+                                <i class="bi bi-inbox fs-3 d-block mb-2"></i>데이터가 없습니다.
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <div id="stockNoResult" class="text-center py-4 text-muted-sm d-none">
+                    <i class="bi bi-search fs-3 d-block mb-2"></i>검색 결과가 없습니다.
+                </div>
+            </div>
+        </div><!-- /#pane-stock -->
+
+        <!-- ── 탭 2: 입출고 이력 ──────────────────── -->
+        <div class="tab-pane fade" id="pane-history" role="tabpanel" aria-labelledby="tab-history">
+            <!-- 검색 필터 -->
+            <div class="ms-filter-card m-3 mb-0">
+                <div class="row g-2 align-items-end">
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 text-muted-sm">품목코드</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-search"></i></span>
+                            <input type="text" id="histSearch" class="form-control"
+                                   placeholder="품목코드 검색..." autocomplete="off" />
+                        </div>
+                    </div>
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 text-muted-sm">트랜잭션 유형</label>
+                        <select id="histType" class="form-select form-select-sm">
+                            <option value="">전체 유형</option>
+                            <option value="Receipt">입고</option>
+                            <option value="Issue">출고</option>
+                            <option value="Adjustment">조정</option>
+                        </select>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1 text-muted-sm">시작일</label>
+                        <input type="date" id="histFrom" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1 text-muted-sm">종료일</label>
+                        <input type="date" id="histTo" class="form-control form-control-sm" />
+                    </div>
+                    <div class="col-12 col-md-2 d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btnHistReset">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 테이블 -->
+            <div class="mes-table-wrapper p-3">
+                <table class="mes-table" id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>일시</th>
+                            <th>품목코드</th>
+                            <th>품목명</th>
+                            <th>유형</th>
+                            <th class="text-end">수량</th>
+                            <th>참조번호</th>
+                            <th>처리자</th>
+                        </tr>
+                    </thead>
+                    <tbody id="histTbody">
+                    @foreach (var tx in Model.Transactions)
+                    {
+                        var typeLabel = tx.TransactionType switch
+                        {
+                            InventoryTransactionType.Receipt    => "입고",
+                            InventoryTransactionType.Issue      => "출고",
+                            InventoryTransactionType.Adjustment => "조정",
+                            _                                   => "-"
+                        };
+                        var typeBadgeClass = tx.TransactionType switch
+                        {
+                            InventoryTransactionType.Receipt    => "status-badge-completed",
+                            InventoryTransactionType.Issue      => "status-badge-confirmed",
+                            InventoryTransactionType.Adjustment => "status-badge-draft",
+                            _                                   => "status-badge-draft"
+                        };
+                        var qtyClass = tx.TransactionType switch
+                        {
+                            InventoryTransactionType.Receipt    => "text-success fw-600",
+                            InventoryTransactionType.Issue      => "text-danger fw-600",
+                            _                                   => "text-muted fw-600"
+                        };
+                        var qtySign = tx.TransactionType switch
+                        {
+                            InventoryTransactionType.Receipt    => "+",
+                            InventoryTransactionType.Issue      => "-",
+                            _                                   => "±"
+                        };
+                        var txTypeStr = tx.TransactionType.ToString();
+                        var txDate = tx.TransactionDate.ToLocalTime();
+                        <tr class="hist-row"
+                            data-code="@tx.ItemCode.ToLower()"
+                            data-type="@txTypeStr"
+                            data-date="@txDate.ToString("yyyy-MM-dd")">
+                            <td class="text-muted-sm">@txDate.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="fw-600 text-primary-ms">@tx.ItemCode</td>
+                            <td>@(string.IsNullOrWhiteSpace(tx.ItemName) ? "-" : tx.ItemName)</td>
+                            <td>
+                                <span class="ms-badge @typeBadgeClass">@typeLabel</span>
+                            </td>
+                            <td class="text-end @qtyClass">@qtySign @tx.Quantity.ToString("N2")</td>
+                            <td class="text-muted-sm">@(tx.ReferenceNo ?? "-")</td>
+                            <td class="text-muted-sm">@(tx.CreatedBy ?? "-")</td>
+                        </tr>
+                    }
+                    @if (!Model.Transactions.Any())
+                    {
+                        <tr id="histEmpty">
+                            <td colspan="7" class="text-center py-4 text-muted-sm">
+                                <i class="bi bi-inbox fs-3 d-block mb-2"></i>입출고 이력이 없습니다.
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+                <div id="histNoResult" class="text-center py-4 text-muted-sm d-none">
+                    <i class="bi bi-search fs-3 d-block mb-2"></i>검색 결과가 없습니다.
+                </div>
+            </div>
+        </div><!-- /#pane-history -->
+
+    </div><!-- /.tab-content -->
+</div><!-- /.ms-card (tabs) -->
+
+
+<!-- ════════════════════════════════════════════
+     입고 / 출고 / 조정 공통 모달
+════════════════════════════════════════════ -->
+<div class="modal fade" id="txModal" tabindex="-1" aria-labelledby="txModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" id="txModalHeader">
+                <h5 class="modal-title" id="txModalLabel">입고 처리</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <form id="txForm" class="needs-validation" novalidate>
+                    <input type="hidden" id="txType" name="txType" />
+                    <input type="hidden" id="txWarehouse" name="txWarehouse" />
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label">품목코드</label>
+                            <input type="text" id="txItemCode" class="form-control form-control-sm" readonly />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">단위</label>
+                            <input type="text" id="txUnit" class="form-control form-control-sm" readonly />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">품목명</label>
+                            <input type="text" id="txItemName" class="form-control form-control-sm" readonly />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">현재재고</label>
+                            <input type="text" id="txCurrentStock" class="form-control form-control-sm" readonly />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label" id="txQtyLabel">수량 <span class="text-danger">*</span></label>
+                            <input type="number" id="txQuantity" class="form-control form-control-sm"
+                                   min="0.01" step="0.01" required
+                                   placeholder="수량 입력" />
+                            <div class="invalid-feedback">수량을 입력하세요 (0 초과).</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">참조번호 <small class="text-muted">(수주번호, 발주번호 등)</small></label>
+                            <input type="text" id="txRefNo" class="form-control form-control-sm"
+                                   placeholder="선택 입력" maxlength="50" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">처리자 <span class="text-danger">*</span></label>
+                            <input type="text" id="txCreatedBy" class="form-control form-control-sm"
+                                   required placeholder="처리자 이름" maxlength="50" />
+                            <div class="invalid-feedback">처리자를 입력하세요.</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">비고</label>
+                            <textarea id="txRemarks" class="form-control form-control-sm" rows="2"
+                                      placeholder="선택 입력" maxlength="200"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-sm" id="btnTxSave" data-save>
+                    <i class="bi bi-check-lg me-1"></i><span id="btnTxSaveLabel">저장</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    /* ── 도넛 차트 ──────────────────────────────── */
+    var chartCtx = document.getElementById('chartInventory');
+    if (chartCtx) {
+        new Chart(chartCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['정상', '부족', '소진'],
+                datasets: [{
+                    data: [@Model.NormalCount, @Model.LowStockCount, @Model.OutOfStockCount],
+                    backgroundColor: ['#28a745', '#ffc107', '#dc3545'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                var pct = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
+                                return ctx.label + ': ' + ctx.parsed + '건 (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                afterDraw: function (chart) {
+                    var c = chart.ctx;
+                    var cx = (chart.chartArea.left + chart.chartArea.right) / 2;
+                    var cy = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+                    var total = @Model.TotalCount;
+                    c.save();
+                    c.textAlign = 'center'; c.textBaseline = 'middle';
+                    c.fillStyle = '#1a73e8';
+                    c.font = 'bold 22px Noto Sans KR, sans-serif';
+                    c.fillText(total, cx, cy - 8);
+                    c.fillStyle = '#6c757d';
+                    c.font = '11px Noto Sans KR, sans-serif';
+                    c.fillText('전체', cx, cy + 12);
+                    c.restore();
+                }
+            }]
+        });
     }
-    @if (!Model.Inventories.Any())
-    {
-        <tr><td colspan="7" style="text-align:center; color:#aaa; padding:24px;">데이터가 없습니다.</td></tr>
+
+    /* ── KPI 카드 클릭 필터 ────────────────────── */
+    document.getElementById('kpiLowStock').addEventListener('click', function () {
+        document.getElementById('stockStatus').value = 'LowStock';
+        filterStockTable();
+        document.getElementById('tab-stock').click();
+    });
+    document.getElementById('kpiOutOfStock').addEventListener('click', function () {
+        document.getElementById('stockStatus').value = 'OutOfStock';
+        filterStockTable();
+        document.getElementById('tab-stock').click();
+    });
+
+    /* ── 재고 현황 필터 ────────────────────────── */
+    function filterStockTable() {
+        var searchVal = (document.getElementById('stockSearch').value || '').toLowerCase().trim();
+        var whVal = (document.getElementById('stockWarehouse').value || '').toLowerCase();
+        var stVal = (document.getElementById('stockStatus').value || '');
+        var rows = document.querySelectorAll('.stock-row');
+        var visibleCount = 0;
+
+        rows.forEach(function (row) {
+            var code = row.getAttribute('data-code') || '';
+            var name = row.getAttribute('data-name') || '';
+            var wh   = (row.getAttribute('data-warehouse') || '').toLowerCase();
+            var st   = row.getAttribute('data-status') || '';
+
+            var matchSearch = !searchVal || code.includes(searchVal) || name.includes(searchVal);
+            var matchWh     = !whVal || wh === whVal;
+            var matchSt     = !stVal || st === stVal;
+
+            if (matchSearch && matchWh && matchSt) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var noResult = document.getElementById('stockNoResult');
+        if (noResult) noResult.classList.toggle('d-none', visibleCount > 0);
     }
-    </tbody>
-</table>
+
+    document.getElementById('stockSearch').addEventListener('input', filterStockTable);
+    document.getElementById('stockWarehouse').addEventListener('change', filterStockTable);
+    document.getElementById('stockStatus').addEventListener('change', filterStockTable);
+    document.getElementById('btnStockReset').addEventListener('click', function () {
+        document.getElementById('stockSearch').value = '';
+        document.getElementById('stockWarehouse').value = '';
+        document.getElementById('stockStatus').value = '';
+        filterStockTable();
+    });
+
+    /* ── 입출고 이력 필터 ──────────────────────── */
+    function filterHistoryTable() {
+        var searchVal = (document.getElementById('histSearch').value || '').toLowerCase().trim();
+        var typeVal   = document.getElementById('histType').value || '';
+        var fromVal   = document.getElementById('histFrom').value || '';
+        var toVal     = document.getElementById('histTo').value || '';
+        var rows = document.querySelectorAll('.hist-row');
+        var visibleCount = 0;
+
+        rows.forEach(function (row) {
+            var code = row.getAttribute('data-code') || '';
+            var type = row.getAttribute('data-type') || '';
+            var date = row.getAttribute('data-date') || '';
+
+            var matchCode = !searchVal || code.includes(searchVal);
+            var matchType = !typeVal || type === typeVal;
+            var matchFrom = !fromVal || date >= fromVal;
+            var matchTo   = !toVal   || date <= toVal;
+
+            if (matchCode && matchType && matchFrom && matchTo) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var noResult = document.getElementById('histNoResult');
+        if (noResult) noResult.classList.toggle('d-none', visibleCount > 0);
+    }
+
+    document.getElementById('histSearch').addEventListener('input', filterHistoryTable);
+    document.getElementById('histType').addEventListener('change', filterHistoryTable);
+    document.getElementById('histFrom').addEventListener('change', filterHistoryTable);
+    document.getElementById('histTo').addEventListener('change', filterHistoryTable);
+    document.getElementById('btnHistReset').addEventListener('click', function () {
+        document.getElementById('histSearch').value = '';
+        document.getElementById('histType').value = '';
+        document.getElementById('histFrom').value = '';
+        document.getElementById('histTo').value = '';
+        filterHistoryTable();
+    });
+
+    /* ── 트랜잭션 모달 ────────────────────────── */
+    var txModalEl = document.getElementById('txModal');
+    var txModal   = new bootstrap.Modal(txModalEl);
+
+    var txConfig = {
+        Receipt:    { title: '입고 처리',   headerClass: 'bg-success text-white', btnClass: 'btn-success',   qtyLabel: '입고 수량' },
+        Issue:      { title: '출고 처리',   headerClass: 'bg-primary text-white', btnClass: 'btn-primary',   qtyLabel: '출고 수량' },
+        Adjustment: { title: '재고 조정',   headerClass: 'bg-secondary text-white', btnClass: 'btn-secondary', qtyLabel: '조정 후 재고' }
+    };
+
+    document.querySelectorAll('.btn-tx').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var type         = this.getAttribute('data-tx-type');
+            var itemCode     = this.getAttribute('data-item-code');
+            var itemName     = this.getAttribute('data-item-name');
+            var warehouse    = this.getAttribute('data-warehouse');
+            var currentStock = this.getAttribute('data-current-stock');
+            var unit         = this.getAttribute('data-unit');
+
+            var cfg = txConfig[type] || txConfig.Receipt;
+
+            // 모달 헤더 스타일
+            var header = document.getElementById('txModalHeader');
+            header.className = 'modal-header ' + cfg.headerClass;
+            document.getElementById('txModalLabel').textContent = cfg.title;
+            document.getElementById('txQtyLabel').innerHTML =
+                cfg.qtyLabel + ' <span class="text-danger">*</span>';
+
+            // 저장 버튼 색상
+            var saveBtn = document.getElementById('btnTxSave');
+            saveBtn.className = 'btn btn-sm ' + cfg.btnClass;
+            document.getElementById('btnTxSaveLabel').textContent = cfg.title;
+
+            // 폼 채우기
+            document.getElementById('txType').value         = type;
+            document.getElementById('txWarehouse').value    = warehouse;
+            document.getElementById('txItemCode').value     = itemCode;
+            document.getElementById('txItemName').value     = itemName;
+            document.getElementById('txUnit').value         = unit;
+            document.getElementById('txCurrentStock').value = parseFloat(currentStock).toLocaleString('ko-KR');
+            document.getElementById('txQuantity').value     = '';
+            document.getElementById('txRefNo').value        = '';
+            document.getElementById('txCreatedBy').value    = '';
+            document.getElementById('txRemarks').value      = '';
+
+            // 유효성 초기화
+            var form = document.getElementById('txForm');
+            form.classList.remove('was-validated');
+
+            txModal.show();
+        });
+    });
+
+    /* ── 저장 처리 ────────────────────────────── */
+    document.getElementById('btnTxSave').addEventListener('click', function () {
+        var form = document.getElementById('txForm');
+        form.classList.add('was-validated');
+
+        if (!form.checkValidity()) {
+            var first = form.querySelector(':invalid');
+            if (first) first.focus();
+            return;
+        }
+
+        var payload = {
+            ItemCode:        document.getElementById('txItemCode').value,
+            WarehouseCode:   document.getElementById('txWarehouse').value,
+            TransactionType: parseInt(
+                ({ Receipt: 0, Issue: 1, Adjustment: 2 })[document.getElementById('txType').value] ?? 0
+            ),
+            Quantity:        parseFloat(document.getElementById('txQuantity').value),
+            ReferenceNo:     document.getElementById('txRefNo').value || null,
+            Remarks:         document.getElementById('txRemarks').value || null,
+            CreatedBy:       document.getElementById('txCreatedBy').value
+        };
+
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch('/api/inventory/transaction', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(function (res) {
+            return res.json().then(function (data) {
+                return { ok: res.ok, data: data };
+            });
+        })
+        .then(function (result) {
+            txModal.hide();
+            if (result.ok && (result.data.success !== false)) {
+                showToast('처리가 완료되었습니다.', 'success');
+                setTimeout(function () { location.reload(); }, 1200);
+            } else {
+                showToast((result.data.message || '처리 중 오류가 발생했습니다.'), 'danger');
+            }
+        })
+        .catch(function (err) {
+            showToast('네트워크 오류가 발생했습니다.', 'danger');
+            console.error(err);
+        })
+        .finally(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i><span id="btnTxSaveLabel">저장</span>';
+        });
+    });
+
+})();
+</script>
+}

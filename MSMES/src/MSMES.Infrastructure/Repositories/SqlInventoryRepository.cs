@@ -81,13 +81,30 @@ public sealed class SqlInventoryRepository : IInventoryRepository
         string itemCode, DateTime? from, DateTime? to, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
-        const string sql = @"SELECT * FROM dbo.InventoryTransactions
-            WHERE ItemCode = @itemCode
-              AND (@from IS NULL OR TransactionDate >= @from)
-              AND (@to   IS NULL OR TransactionDate <= @to)
-            ORDER BY TransactionDate DESC";
+        const string sql = @"
+            SELECT t.*, ISNULL(i.ItemName, t.ItemCode) AS ItemName
+            FROM dbo.InventoryTransactions t
+            LEFT JOIN dbo.Inventories i ON i.ItemCode = t.ItemCode AND i.WarehouseCode = t.WarehouseCode
+            WHERE t.ItemCode = @itemCode
+              AND (@from IS NULL OR t.TransactionDate >= @from)
+              AND (@to   IS NULL OR t.TransactionDate <= @to)
+            ORDER BY t.TransactionDate DESC";
         var rows = await conn.QueryAsync<InventoryTransaction>(
             new CommandDefinition(sql, new { itemCode, from, to }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<InventoryTransaction>> GetRecentTransactionsAsync(
+        int count, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        const string sql = @"
+            SELECT TOP (@count) t.*, ISNULL(i.ItemName, t.ItemCode) AS ItemName
+            FROM dbo.InventoryTransactions t
+            LEFT JOIN dbo.Inventories i ON i.ItemCode = t.ItemCode AND i.WarehouseCode = t.WarehouseCode
+            ORDER BY t.TransactionDate DESC";
+        var rows = await conn.QueryAsync<InventoryTransaction>(
+            new CommandDefinition(sql, new { count }, cancellationToken: ct));
         return rows.ToList();
     }
 

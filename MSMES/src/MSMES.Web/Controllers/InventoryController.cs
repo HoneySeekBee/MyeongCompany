@@ -54,13 +54,30 @@ public class InventoryController : ControllerBase
         return Ok(list);
     }
 
+    /// <summary>최근 입출고 이력 (전체 품목)</summary>
+    [HttpGet("transactions/recent")]
+    public async Task<IActionResult> RecentTransactions(
+        [FromQuery] int count = 50,
+        CancellationToken ct = default)
+    {
+        var list = await _repo.GetRecentTransactionsAsync(count, ct);
+        return Ok(list);
+    }
+
     /// <summary>입고/출고/조정 처리</summary>
     [HttpPost("transaction")]
     public async Task<IActionResult> CreateTransaction(
         [FromBody] CreateInventoryTransactionCommand cmd,
         CancellationToken ct = default)
     {
-        var txId = await _transaction.HandleAsync(cmd, ct);
-        return Ok(new { TransactionId = txId });
+        try
+        {
+            var txId = await _transaction.HandleAsync(cmd, ct);
+            return Ok(new { TransactionId = txId, Success = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Success = false, Message = ex.Message });
+        }
     }
 }
