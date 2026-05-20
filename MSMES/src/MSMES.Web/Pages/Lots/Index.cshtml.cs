@@ -1,11 +1,9 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Application.LotManagement;
 using MSMES.Domain.LotManagement;
 
 namespace MSMES.Web.Pages.Lots;
 
-[Authorize]
 public class IndexModel : PageModel
 {
     private readonly ListAllLotsHandler _listAll;
