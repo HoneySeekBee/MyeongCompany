@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MSMES.Application.Quality;
@@ -6,7 +7,7 @@ using MSMES.Domain.Quality;
 namespace MSMES.Web.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Route("api/quality")]
 public class QualityController : ControllerBase
 {

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MSMES.Application.Equipment;
@@ -6,7 +7,7 @@ using MSMES.Domain.Equipment;
 namespace MSMES.Web.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Route("api/equipment")]
 public class EquipmentController : ControllerBase
 {

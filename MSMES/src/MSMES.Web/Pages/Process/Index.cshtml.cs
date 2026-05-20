@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Domain.Process;
 
 namespace MSMES.Web.Pages.Process;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly IProcessRepository _repo;

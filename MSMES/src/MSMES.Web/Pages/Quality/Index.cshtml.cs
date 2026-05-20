@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Domain.Quality;
 
 namespace MSMES.Web.Pages.Quality;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly IQualityRepository _repo;

@@ -1,0 +1,356 @@
+@page
+@model MSMES.Web.Pages.Admin.Users.IndexModel
+@{
+    ViewData["Title"] = "사용자 관리";
+
+    string RoleBadge(string role) => role switch
+    {
+        "Admin"     => "<span class=\"badge bg-danger\">Admin</span>",
+        "Manager"   => "<span class=\"badge bg-primary\">Manager</span>",
+        "Sales"     => "<span class=\"badge bg-success\">Sales</span>",
+        "Purchase"  => "<span class=\"badge bg-warning text-dark\">Purchase</span>",
+        "QA"        => "<span class=\"badge\" style=\"background-color:#6f42c1;\">QA</span>",
+        "Warehouse" => "<span class=\"badge bg-secondary\">Warehouse</span>",
+        "Worker"    => "<span class=\"badge bg-info text-dark\">Worker</span>",
+        _           => $"<span class=\"badge bg-secondary\">{role}</span>"
+    };
+
+    string RoleLabel(string role) => role switch
+    {
+        "Admin"     => "관리자",
+        "Manager"   => "생산관리자",
+        "Sales"     => "영업담당",
+        "Purchase"  => "구매담당",
+        "QA"        => "품질담당",
+        "Warehouse" => "창고담당",
+        "Worker"    => "작업자",
+        _           => role
+    };
+}
+
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>사용자 관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active">사용자 관리</li>
+            </ol>
+        </nav>
+    </div>
+    <div>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createModal">
+            <i class="bi bi-person-plus me-1"></i> 사용자 등록
+        </button>
+    </div>
+</div>
+
+@if (TempData["SuccessMessage"] is string msg)
+{
+    <div class="alert alert-success alert-dismissible fade show mb-3" role="alert">
+        <i class="bi bi-check-circle me-1"></i> @msg
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="닫기"></button>
+    </div>
+}
+
+<!-- KPI 카드 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                <span>전체 사용자</span>
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="kpi-card__value">@Model.TotalUsers</div>
+            <div class="kpi-card__sub">등록된 전체 계정 수</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                <span>활성 사용자</span>
+                <i class="bi bi-person-check"></i>
+            </div>
+            <div class="kpi-card__value">@Model.ActiveUsers</div>
+            <div class="kpi-card__sub">현재 활성화된 계정</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="kpi-card kpi-info">
+            <div class="kpi-card__label">
+                <span>주요 Role</span>
+                <i class="bi bi-shield-check"></i>
+            </div>
+            <div class="kpi-card__value" style="font-size:20px;">@RoleLabel(Model.TopRole)</div>
+            <div class="kpi-card__sub">가장 많은 Role: @Model.TopRole</div>
+        </div>
+    </div>
+</div>
+
+<!-- 사용자 목록 -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <h5 class="ms-card__title"><i class="bi bi-table me-1"></i> 사용자 목록</h5>
+        <span class="text-muted-sm">총 @Model.TotalUsers 명</span>
+    </div>
+    <div class="ms-card__body p-0">
+        <div class="mes-table-wrapper">
+            <table class="mes-table">
+                <thead>
+                    <tr>
+                        <th>사용자ID</th>
+                        <th>이름</th>
+                        <th>이메일</th>
+                        <th>Role</th>
+                        <th>등록일</th>
+                        <th>상태</th>
+                        <th style="width:130px;">액션</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in Model.Users)
+                    {
+                        <tr>
+                            <td><span class="fw-600">@u.UserId</span></td>
+                            <td>@u.Name</td>
+                            <td>@(string.IsNullOrEmpty(u.Email) ? "-" : u.Email)</td>
+                            <td>@Html.Raw(RoleBadge(u.Role))</td>
+                            <td class="text-muted-sm">@u.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd")</td>
+                            <td>
+                                @if (u.IsActive)
+                                {
+                                    <span class="ms-badge status-badge-completed">활성</span>
+                                }
+                                else
+                                {
+                                    <span class="ms-badge status-badge-cancelled">비활성</span>
+                                }
+                            </td>
+                            <td>
+                                <button type="button"
+                                        class="btn-icon me-1"
+                                        title="수정"
+                                        onclick="openEditModal(@Html.Raw(System.Text.Json.JsonSerializer.Serialize(new {
+                                            userId = u.UserId,
+                                            name   = u.Name,
+                                            email  = u.Email,
+                                            role   = u.Role
+                                        })))">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                @if (u.IsActive)
+                                {
+                                    <form method="post" asp-page-handler="Delete" style="display:inline;">
+                                        <input type="hidden" name="userId" value="@u.UserId" />
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit"
+                                                class="btn-icon btn-icon-danger"
+                                                title="비활성화"
+                                                onclick="return confirm('@u.Name 계정을 비활성화하시겠습니까?')">
+                                            <i class="bi bi-person-x"></i>
+                                        </button>
+                                    </form>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!Model.Users.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">등록된 사용자가 없습니다.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ══ 사용자 등록 Modal ═══════════════════════════════════ -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-labelledby="createModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createModalLabel"><i class="bi bi-person-plus me-1"></i> 사용자 등록</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form method="post" asp-page-handler="Create">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">사용자 ID <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="CreateInput.UserId"
+                                   required pattern="[A-Za-z0-9]+" title="영문 및 숫자만 입력 가능합니다."
+                                   placeholder="영문+숫자 조합" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">이름 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="CreateInput.Name" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">이메일</label>
+                            <input type="email" class="form-control" name="CreateInput.Email" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" name="CreateInput.Role" required>
+                                <option value="">-- 선택 --</option>
+                                <option value="Admin">Admin (관리자)</option>
+                                <option value="Manager">Manager (생산관리자)</option>
+                                <option value="Sales">Sales (영업담당)</option>
+                                <option value="Purchase">Purchase (구매담당)</option>
+                                <option value="QA">QA (품질담당)</option>
+                                <option value="Warehouse">Warehouse (창고담당)</option>
+                                <option value="Worker">Worker (작업자)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">비밀번호 <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="createPwd" name="CreateInput.Password"
+                                   required minlength="8" placeholder="8자 이상" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">비밀번호 확인 <span class="text-danger">*</span></label>
+                            <input type="password" class="form-control" id="createPwdConfirm"
+                                   required minlength="8" placeholder="비밀번호 재입력" />
+                            <div class="invalid-feedback">비밀번호가 일치하지 않습니다.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary" id="btnCreate">
+                        <i class="bi bi-save me-1"></i> 저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ══ 사용자 수정 Modal ═══════════════════════════════════ -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editModalLabel"><i class="bi bi-pencil me-1"></i> 사용자 수정</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form method="post" asp-page-handler="Update">
+                @Html.AntiForgeryToken()
+                <div class="modal-body">
+                    <input type="hidden" id="editUserId" name="UpdateInput.UserId" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">사용자 ID</label>
+                            <input type="text" class="form-control" id="editUserIdDisplay" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">이름 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="editName" name="UpdateInput.Name" required />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">이메일</label>
+                            <input type="email" class="form-control" id="editEmail" name="UpdateInput.Email" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-600">Role <span class="text-danger">*</span></label>
+                            <select class="form-select" id="editRole" name="UpdateInput.Role" required>
+                                <option value="Admin">Admin (관리자)</option>
+                                <option value="Manager">Manager (생산관리자)</option>
+                                <option value="Sales">Sales (영업담당)</option>
+                                <option value="Purchase">Purchase (구매담당)</option>
+                                <option value="QA">QA (품질담당)</option>
+                                <option value="Warehouse">Warehouse (창고담당)</option>
+                                <option value="Worker">Worker (작업자)</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="chkChangePwd"
+                                       name="UpdateInput.ChangePassword" value="true" />
+                                <label class="form-check-label" for="chkChangePwd">비밀번호 변경</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6" id="newPwdGroup" style="display:none;">
+                            <label class="form-label fw-600">새 비밀번호</label>
+                            <input type="password" class="form-control" id="editNewPwd"
+                                   name="UpdateInput.NewPassword" minlength="8" placeholder="8자 이상" />
+                        </div>
+                        <div class="col-md-6" id="newPwdConfirmGroup" style="display:none;">
+                            <label class="form-label fw-600">새 비밀번호 확인</label>
+                            <input type="password" class="form-control" id="editNewPwdConfirm"
+                                   minlength="8" placeholder="비밀번호 재입력" />
+                            <div class="invalid-feedback">비밀번호가 일치하지 않습니다.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i> 저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// 수정 Modal 열기
+function openEditModal(data) {
+    document.getElementById('editUserId').value        = data.userId;
+    document.getElementById('editUserIdDisplay').value = data.userId;
+    document.getElementById('editName').value          = data.name;
+    document.getElementById('editEmail').value         = data.email || '';
+    document.getElementById('editRole').value          = data.role;
+
+    // 비밀번호 변경 체크박스 초기화
+    var chk = document.getElementById('chkChangePwd');
+    chk.checked = false;
+    document.getElementById('newPwdGroup').style.display = 'none';
+    document.getElementById('newPwdConfirmGroup').style.display = 'none';
+
+    var modal = new bootstrap.Modal(document.getElementById('editModal'));
+    modal.show();
+}
+
+// 비밀번호 변경 체크박스 토글
+document.getElementById('chkChangePwd').addEventListener('change', function() {
+    var show = this.checked ? '' : 'none';
+    document.getElementById('newPwdGroup').style.display = show;
+    document.getElementById('newPwdConfirmGroup').style.display = show;
+    document.getElementById('editNewPwd').required = this.checked;
+});
+
+// 비밀번호 확인 검증 (등록)
+document.getElementById('btnCreate').addEventListener('click', function(e) {
+    var p1 = document.getElementById('createPwd');
+    var p2 = document.getElementById('createPwdConfirm');
+    if (p1.value !== p2.value) {
+        e.preventDefault();
+        p2.classList.add('is-invalid');
+    } else {
+        p2.classList.remove('is-invalid');
+    }
+});
+
+// 비밀번호 확인 검증 (수정)
+document.querySelector('#editModal form').addEventListener('submit', function(e) {
+    var chk = document.getElementById('chkChangePwd');
+    if (chk.checked) {
+        var p1 = document.getElementById('editNewPwd');
+        var p2 = document.getElementById('editNewPwdConfirm');
+        if (p1.value !== p2.value) {
+            e.preventDefault();
+            p2.classList.add('is-invalid');
+        } else {
+            p2.classList.remove('is-invalid');
+        }
+    }
+});
+</script>
+}

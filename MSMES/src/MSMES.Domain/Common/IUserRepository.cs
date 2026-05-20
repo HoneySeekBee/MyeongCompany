@@ -6,6 +6,8 @@ public interface IUserRepository
     Task<User?> GetByEmailAsync(string email, CancellationToken ct = default);
     Task AddAsync(User user, CancellationToken ct = default);
     Task UpdateAsync(User user, CancellationToken ct = default);
+    Task<IReadOnlyList<User>> ListAllAsync(CancellationToken ct = default);
+    Task CreateAsync(User user, CancellationToken ct = default);
 }
 
 public interface ICommonCodeRepository

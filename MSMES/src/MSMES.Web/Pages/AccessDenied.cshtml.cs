@@ -1,10 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace MSMES.Web.Pages;
 
-[Authorize]
-public class IndexModel : PageModel
+public class AccessDeniedModel : PageModel
 {
     public void OnGet() { }
 }

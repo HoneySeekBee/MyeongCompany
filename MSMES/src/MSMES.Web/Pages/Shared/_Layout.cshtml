@@ -1,7 +1,20 @@
+@using System.Security.Claims
 @{
     var pageTitle   = ViewData["Title"] as string ?? "MSMES";
-    var userName    = User.Identity?.Name ?? "사용자";
+    var userName    = User.FindFirstValue("UserName") ?? User.Identity?.Name ?? "사용자";
     var userInitial = userName.Length > 0 ? userName.Substring(0, 1).ToUpper() : "U";
+
+    // Role 뱃지 색상 결정
+    string userRole = "Unknown";
+    string roleBadgeClass = "secondary";
+    if (User.IsInRole("Admin"))       { userRole = "관리자";   roleBadgeClass = "danger"; }
+    else if (User.IsInRole("Manager"))    { userRole = "생산관리자"; roleBadgeClass = "primary"; }
+    else if (User.IsInRole("Sales"))      { userRole = "영업담당";  roleBadgeClass = "success"; }
+    else if (User.IsInRole("Purchase"))   { userRole = "구매담당";  roleBadgeClass = "warning"; }
+    else if (User.IsInRole("QA"))         { userRole = "품질담당";  roleBadgeClass = "ms-purple"; }
+    else if (User.IsInRole("Warehouse"))  { userRole = "창고담당";  roleBadgeClass = "secondary"; }
+    else if (User.IsInRole("Worker"))     { userRole = "작업자";    roleBadgeClass = "info"; }
+    else if (User.Identity?.IsAuthenticated == true) { userRole = "사용자"; roleBadgeClass = "secondary"; }
 }
 <!DOCTYPE html>
 <html lang="ko">
@@ -49,78 +62,137 @@
 
         <div class="ms-sidebar__nav">
 
-            <!-- 대시보드 -->
+            <!-- 대시보드: 모든 Role -->
             <a href="/" class="ms-sidebar__link" aria-label="대시보드">
                 <i class="bi bi-speedometer2"></i>
                 <span class="ms-sidebar__link-text">대시보드</span>
             </a>
 
-            <hr class="ms-sidebar__divider" />
+            @{
+                bool isAdmin    = User.IsInRole("Admin");
+                bool isManager  = User.IsInRole("Manager");
+                bool isSales    = User.IsInRole("Sales");
+                bool isPurchase = User.IsInRole("Purchase");
+                bool isQA       = User.IsInRole("QA");
+                bool isWarehouse= User.IsInRole("Warehouse");
+                bool isWorker   = User.IsInRole("Worker");
 
-            <!-- 영업/구매 -->
-            <div class="ms-sidebar__group-label">영업 / 구매</div>
+                bool showSalesGroup    = isAdmin || isManager || isSales || isPurchase;
+                bool showProductionGroup = isAdmin || isManager || isQA || isWorker;
+                bool showLogisticsGroup = isAdmin || isManager || isSales || isPurchase || isWarehouse;
+                bool showQualityGroup  = isAdmin || isManager || isQA;
+            }
 
-            <a href="/SalesOrders" class="ms-sidebar__link" aria-label="수주관리">
-                <i class="bi bi-file-earmark-text"></i>
-                <span class="ms-sidebar__link-text">수주관리</span>
-            </a>
-            <a href="/PurchaseOrders" class="ms-sidebar__link" aria-label="발주관리">
-                <i class="bi bi-cart3"></i>
-                <span class="ms-sidebar__link-text">발주관리</span>
-            </a>
+            @if (showSalesGroup)
+            {
+                <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">영업 / 구매</div>
 
-            <hr class="ms-sidebar__divider" />
+                @if (isAdmin || isManager || isSales)
+                {
+                    <a href="/SalesOrders" class="ms-sidebar__link" aria-label="수주관리">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <span class="ms-sidebar__link-text">수주관리</span>
+                    </a>
+                }
+                @if (isAdmin || isManager || isPurchase)
+                {
+                    <a href="/PurchaseOrders" class="ms-sidebar__link" aria-label="발주관리">
+                        <i class="bi bi-cart3"></i>
+                        <span class="ms-sidebar__link-text">발주관리</span>
+                    </a>
+                }
+            }
 
-            <!-- 생산관리 -->
-            <div class="ms-sidebar__group-label">생산관리</div>
+            @if (showProductionGroup)
+            {
+                <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">생산관리</div>
 
-            <a href="/WorkOrders" class="ms-sidebar__link" aria-label="작업지시">
-                <i class="bi bi-gear"></i>
-                <span class="ms-sidebar__link-text">작업지시</span>
-            </a>
-            <a href="/Lots" class="ms-sidebar__link" aria-label="LOT관리">
-                <i class="bi bi-tags"></i>
-                <span class="ms-sidebar__link-text">LOT관리</span>
-            </a>
-            <a href="/Process" class="ms-sidebar__link" aria-label="공정관리">
-                <i class="bi bi-diagram-3"></i>
-                <span class="ms-sidebar__link-text">공정관리</span>
-            </a>
+                @if (isAdmin || isManager || isWorker)
+                {
+                    <a href="/WorkOrders" class="ms-sidebar__link" aria-label="작업지시">
+                        <i class="bi bi-gear"></i>
+                        <span class="ms-sidebar__link-text">작업지시</span>
+                    </a>
+                }
+                @if (isAdmin || isManager || isQA || isWorker)
+                {
+                    <a href="/Lots" class="ms-sidebar__link" aria-label="LOT관리">
+                        <i class="bi bi-tags"></i>
+                        <span class="ms-sidebar__link-text">LOT관리</span>
+                    </a>
+                }
+                @if (isAdmin || isManager || isWorker)
+                {
+                    <a href="/Process" class="ms-sidebar__link" aria-label="공정관리">
+                        <i class="bi bi-diagram-3"></i>
+                        <span class="ms-sidebar__link-text">공정관리</span>
+                    </a>
+                }
+            }
 
-            <hr class="ms-sidebar__divider" />
+            @if (showLogisticsGroup)
+            {
+                <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">물류</div>
 
-            <!-- 물류 -->
-            <div class="ms-sidebar__group-label">물류</div>
+                @if (isAdmin || isManager || isWarehouse || isPurchase)
+                {
+                    <a href="/Inventory" class="ms-sidebar__link" aria-label="재고관리">
+                        <i class="bi bi-box-seam"></i>
+                        <span class="ms-sidebar__link-text">재고관리</span>
+                    </a>
+                }
+                @if (isAdmin || isManager || isSales || isWarehouse)
+                {
+                    <a href="/Shipments" class="ms-sidebar__link" aria-label="출하관리">
+                        <i class="bi bi-truck"></i>
+                        <span class="ms-sidebar__link-text">출하관리</span>
+                    </a>
+                }
+            }
 
-            <a href="/Inventory" class="ms-sidebar__link" aria-label="재고관리">
-                <i class="bi bi-box-seam"></i>
-                <span class="ms-sidebar__link-text">재고관리</span>
-            </a>
-            <a href="/Shipments" class="ms-sidebar__link" aria-label="출하관리">
-                <i class="bi bi-truck"></i>
-                <span class="ms-sidebar__link-text">출하관리</span>
-            </a>
+            @if (showQualityGroup || isAdmin || isManager)
+            {
+                <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">품질 / 설비</div>
 
-            <hr class="ms-sidebar__divider" />
+                @if (isAdmin || isManager || isQA)
+                {
+                    <a href="/Quality" class="ms-sidebar__link" aria-label="품질관리">
+                        <i class="bi bi-patch-check"></i>
+                        <span class="ms-sidebar__link-text">품질관리</span>
+                    </a>
+                }
+                @if (isAdmin || isManager)
+                {
+                    <a href="/Equipment" class="ms-sidebar__link" aria-label="설비관리">
+                        <i class="bi bi-wrench-adjustable"></i>
+                        <span class="ms-sidebar__link-text">설비관리</span>
+                    </a>
+                }
+            }
 
-            <!-- 품질/설비 -->
-            <div class="ms-sidebar__group-label">품질 / 설비</div>
-
-            <a href="/Quality" class="ms-sidebar__link" aria-label="품질관리">
-                <i class="bi bi-patch-check"></i>
-                <span class="ms-sidebar__link-text">품질관리</span>
-            </a>
-            <a href="/Equipment" class="ms-sidebar__link" aria-label="설비관리">
-                <i class="bi bi-wrench-adjustable"></i>
-                <span class="ms-sidebar__link-text">설비관리</span>
-            </a>
+            @if (isAdmin)
+            {
+                <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">시스템 관리</div>
+                <a href="/Admin/Users" class="ms-sidebar__link" aria-label="사용자관리">
+                    <i class="bi bi-people"></i>
+                    <span class="ms-sidebar__link-text">사용자관리</span>
+                </a>
+            }
 
         </div><!-- /.ms-sidebar__nav -->
 
         <!-- 사이드바 하단 사용자 -->
         <div class="ms-sidebar__footer">
             <div class="ms-sidebar__footer-avatar" aria-hidden="true">@userInitial</div>
-            <span class="ms-sidebar__footer-name">@userName</span>
+            <div class="d-flex flex-column" style="min-width:0;">
+                <span class="ms-sidebar__footer-name">@userName</span>
+                <span class="ms-sidebar__footer-name" style="font-size:11px; opacity:0.7;">@userRole</span>
+            </div>
         </div>
 
     </nav><!-- /.ms-sidebar -->
@@ -148,14 +220,25 @@
                     </span>
                 </button>
 
-                <!-- 사용자 정보 -->
+                <!-- 사용자 정보 + Role 뱃지 -->
                 <div class="ms-header__user">
                     <div class="ms-header__user-avatar" aria-hidden="true">@userInitial</div>
                     <span class="d-none d-md-inline">@userName</span>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        @if (roleBadgeClass == "ms-purple")
+                        {
+                            <span class="badge d-none d-md-inline" style="background-color:#6f42c1;font-size:11px;">@userRole</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-@roleBadgeClass d-none d-md-inline" style="font-size:11px;">@userRole</span>
+                        }
+                    }
                 </div>
 
                 <!-- 로그아웃 -->
-                <a href="/Account/Logout" class="btn btn-sm btn-outline-secondary" aria-label="로그아웃">
+                <a href="/Logout" class="btn btn-sm btn-outline-secondary" aria-label="로그아웃">
                     <i class="bi bi-box-arrow-right"></i>
                     <span class="d-none d-sm-inline ms-1">로그아웃</span>
                 </a>

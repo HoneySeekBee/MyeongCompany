@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MSMES.Application.SalesOrder;
@@ -5,7 +6,7 @@ using MSMES.Application.SalesOrder;
 namespace MSMES.Web.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
 [Route("api/sales-orders")]
 public class SalesOrdersController : ControllerBase
 {

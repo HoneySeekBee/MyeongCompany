@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Application.Inventory;
 using MSMES.Domain.Inventory;
 
 namespace MSMES.Web.Pages.Inventory;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly GetInventoryStatusHandler _status;

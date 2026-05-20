@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Domain.Shipment;
 
 namespace MSMES.Web.Pages.Shipments;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly IShipmentRepository _repo;

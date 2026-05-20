@@ -39,6 +39,23 @@ public sealed class SqlUserRepository : IUserRepository
             PasswordHash=@PasswordHash, IsActive=@IsActive, UpdatedAt=SYSUTCDATETIME() WHERE UserId=@UserId";
         await conn.ExecuteAsync(new CommandDefinition(sql, user, cancellationToken: ct));
     }
+
+    public async Task<IReadOnlyList<User>> ListAllAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<User>(new CommandDefinition(
+            "SELECT * FROM dbo.Users ORDER BY CreatedAt DESC", cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task CreateAsync(User user, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        const string sql = @"INSERT INTO dbo.Users
+            (UserId, Name, Email, Role, PasswordHash, IsActive, CreatedAt, CreatedBy)
+            VALUES (@UserId,@Name,@Email,@Role,@PasswordHash,@IsActive,@CreatedAt,@CreatedBy)";
+        await conn.ExecuteAsync(new CommandDefinition(sql, user, cancellationToken: ct));
+    }
 }
 
 public sealed class SqlCommonCodeRepository : ICommonCodeRepository

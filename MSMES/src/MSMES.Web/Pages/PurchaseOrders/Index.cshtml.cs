@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Domain.PurchaseOrder;
 
 namespace MSMES.Web.Pages.PurchaseOrders;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly IPurchaseOrderRepository _repo;

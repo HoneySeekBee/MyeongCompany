@@ -1,4 +1,5 @@
 using System.Text;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -44,9 +45,20 @@ builder.Services.AddScoped<CreateProductionResultHandler>();
 builder.Services.AddScoped<GetProductionResultHandler>();
 builder.Services.AddScoped<DashboardHandler>();
 
-// JWT auth
+// JWT + Cookie 이중 인증 체계
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/Login";
+        options.LogoutPath = "/Logout";
+        options.AccessDeniedPath = "/AccessDenied";
+        options.ExpireTimeSpan = TimeSpan.FromHours(8);
+        options.SlidingExpiration = true;
+        options.Cookie.Name = "MSMES.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+    })
     .AddJwtBearer(options =>
     {
         options.TokenValidationParameters = new TokenValidationParameters
@@ -60,7 +72,16 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey))
         };
     });
-builder.Services.AddAuthorization();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
+    options.AddPolicy("ProductionAccess", p => p.RequireRole("Admin", "Manager", "Worker"));
+    options.AddPolicy("SalesAccess", p => p.RequireRole("Admin", "Manager", "Sales"));
+    options.AddPolicy("PurchaseAccess", p => p.RequireRole("Admin", "Manager", "Purchase"));
+    options.AddPolicy("QAAccess", p => p.RequireRole("Admin", "QA", "Manager"));
+    options.AddPolicy("WarehouseAccess", p => p.RequireRole("Admin", "Manager", "Warehouse"));
+});
 
 builder.Services.AddRazorPages();
 builder.Services.AddControllers();

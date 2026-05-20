@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using MSMES.Application.SalesOrder;
 
 namespace MSMES.Web.Pages.SalesOrders;
 
+[Authorize]
 public class IndexModel : PageModel
 {
     private readonly ListSalesOrdersHandler _list;
