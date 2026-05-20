@@ -1,12 +1,804 @@
 @page
 @model MSMES.Web.Pages.Shipments.IndexModel
+@using MSMES.Domain.Shipment
 @{ ViewData["Title"] = "출하 관리"; }
 
-<h1>출하 목록</h1>
-<a class="btn" href="#">신규 출하</a>
-<table style="margin-top:16px;">
-    <thead><tr><th>출하번호</th><th>수주번호</th><th>출하일</th><th>수령처</th><th>상태</th></tr></thead>
-    <tbody>
-        <tr><td colspan="5">데이터 없음 (목록 페이지 틀)</td></tr>
-    </tbody>
-</table>
+<!-- ══════════════════════════════════════════
+     페이지 헤더
+══════════════════════════════════════════ -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>출하 관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">대시보드</a></li>
+                <li class="breadcrumb-item active">출하 관리</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="ms-page-header__right">
+        <button class="btn btn-primary" id="btnOpenRegister">
+            <i class="bi bi-plus-lg me-1"></i>출하 등록
+        </button>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     KPI 카드 4개
+══════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                전체 출하 건수
+                <i class="bi bi-truck"></i>
+            </div>
+            <div class="kpi-card__value">@Model.TotalCount.ToString("N0")</div>
+            <div class="kpi-card__sub">전체 등록된 출하</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                출하 완료
+                <i class="bi bi-check2-circle"></i>
+            </div>
+            <div class="kpi-card__value">@Model.DeliveredCount.ToString("N0")</div>
+            <div class="kpi-card__sub">배송 완료 건수</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">
+                배송중
+                <i class="bi bi-box-seam"></i>
+            </div>
+            <div class="kpi-card__value">@Model.ShippedCount.ToString("N0")</div>
+            <div class="kpi-card__sub">현재 배송 진행 건</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card" style="border-left-color:#6f42c1;">
+            <div class="kpi-card__label">
+                이번 달 출하
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div class="kpi-card__value" style="color:#6f42c1;">@Model.MonthlyAmount.ToString("N0")<small style="font-size:14px;font-weight:400;margin-left:4px;">건</small></div>
+            <div class="kpi-card__sub">@DateTime.Today.ToString("yyyy년 MM월") 출하 건수</div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     출하 현황 바 차트
+══════════════════════════════════════════ -->
+<div class="ms-card mb-4">
+    <div class="ms-card__header">
+        <span class="ms-card__title"><i class="bi bi-bar-chart me-2"></i>최근 7일 일별 출하 현황</span>
+    </div>
+    <div class="ms-card__body">
+        <div class="chart-container" style="height:200px;">
+            <canvas id="chartShipmentTrend"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     탭 구조
+══════════════════════════════════════════ -->
+<ul class="nav nav-tabs mb-3" id="shipmentTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="tab-list-btn" data-bs-toggle="tab"
+                data-bs-target="#tabList" type="button" role="tab">
+            <i class="bi bi-list-ul me-1"></i>출하 목록
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-items-btn" data-bs-toggle="tab"
+                data-bs-target="#tabItems" type="button" role="tab">
+            <i class="bi bi-card-list me-1"></i>출하 품목 이력
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+
+    <!-- ──────────────────────────────
+         탭1: 출하 목록
+    ────────────────────────────── -->
+    <div class="tab-pane fade show active" id="tabList" role="tabpanel">
+
+        <!-- 검색 필터 -->
+        <div class="ms-filter-card mb-3">
+            <div class="row g-2 align-items-end">
+                <div class="col-12 col-md-2">
+                    <label class="form-label mb-1 small fw-600">출하번호</label>
+                    <input type="text" id="fShipmentNo" class="form-control form-control-sm" placeholder="SHP...">
+                </div>
+                <div class="col-12 col-md-2">
+                    <label class="form-label mb-1 small fw-600">수주번호</label>
+                    <input type="text" id="fSalesOrderNo" class="form-control form-control-sm" placeholder="SO...">
+                </div>
+                <div class="col-12 col-md-2">
+                    <label class="form-label mb-1 small fw-600">수령처</label>
+                    <input type="text" id="fDeliveryAddress" class="form-control form-control-sm" placeholder="수령처 검색">
+                </div>
+                <div class="col-12 col-md-2">
+                    <label class="form-label mb-1 small fw-600">상태</label>
+                    <select id="fStatus" class="form-select form-select-sm">
+                        <option value="">전체</option>
+                        <option value="Draft">초안</option>
+                        <option value="Picking">피킹중</option>
+                        <option value="Shipped">출하완료</option>
+                        <option value="Delivered">배송완료</option>
+                        <option value="Cancelled">취소</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1 small fw-600">출하일 From</label>
+                    <input type="date" id="fDateFrom" class="form-control form-control-sm">
+                </div>
+                <div class="col-6 col-md-2">
+                    <label class="form-label mb-1 small fw-600">출하일 To</label>
+                    <input type="date" id="fDateTo" class="form-control form-control-sm">
+                </div>
+                <div class="col-12 col-md-12 d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" id="btnSearch">
+                        <i class="bi bi-search me-1"></i>검색
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" id="btnReset">
+                        <i class="bi bi-x-circle me-1"></i>초기화
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 출하 목록 테이블 -->
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <span class="ms-card__title">출하 목록</span>
+                <span id="listCount" class="badge bg-secondary">0건</span>
+            </div>
+            <div class="mes-table-wrapper">
+                <table class="mes-table">
+                    <thead>
+                        <tr>
+                            <th style="width:40px;"><input type="checkbox" id="chkAll" class="form-check-input"></th>
+                            <th>출하번호</th>
+                            <th>수주번호</th>
+                            <th>수령처</th>
+                            <th>출하일</th>
+                            <th style="width:70px;text-align:center;">품목수</th>
+                            <th style="width:100px;text-align:center;">상태</th>
+                            <th style="width:120px;text-align:center;">액션</th>
+                        </tr>
+                    </thead>
+                    <tbody id="shipmentTbody">
+                        <tr id="trNoData">
+                            <td colspan="8" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-4 d-block mb-2"></i>데이터가 없습니다.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ──────────────────────────────
+         탭2: 출하 품목 이력
+    ────────────────────────────── -->
+    <div class="tab-pane fade" id="tabItems" role="tabpanel">
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <span class="ms-card__title">출하 품목 이력 (최근 50건)</span>
+            </div>
+            <div class="mes-table-wrapper">
+                <table class="mes-table">
+                    <thead>
+                        <tr>
+                            <th>출하번호</th>
+                            <th>출하일</th>
+                            <th>수주번호</th>
+                            <th>LOT번호</th>
+                            <th>품목코드</th>
+                            <th>품목명</th>
+                            <th style="text-align:right;">출하수량</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (!Model.ShipmentItems.Any())
+                        {
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <i class="bi bi-inbox fs-4 d-block mb-2"></i>출하 품목 이력이 없습니다.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var item in Model.ShipmentItems)
+                            {
+                                var parentShipment = Model.Shipments.FirstOrDefault(s => s.ShipmentNo == item.ShipmentNo);
+                                <tr>
+                                    <td><span class="fw-600 text-primary-ms">@item.ShipmentNo</span></td>
+                                    <td>@(parentShipment?.ShipmentDate.ToString("yyyy-MM-dd") ?? "-")</td>
+                                    <td>@(parentShipment?.SalesOrderNo ?? "-")</td>
+                                    <td><code class="text-primary-ms">@item.LotNo</code></td>
+                                    <td>@item.ItemCode</td>
+                                    <td class="text-muted-sm">-</td>
+                                    <td style="text-align:right;">@item.ShipQuantity.ToString("N0")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div><!-- /tab-content -->
+
+
+<!-- ══════════════════════════════════════════
+     출하 상세 Offcanvas (우측)
+══════════════════════════════════════════ -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="shipmentDetailOffcanvas" style="width:500px;"
+     aria-labelledby="offcanvasDetailLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="offcanvasDetailLabel">
+            <i class="bi bi-truck me-2"></i>출하 상세
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+    </div>
+    <div class="offcanvas-body">
+        <!-- 기본 정보 -->
+        <div class="row g-2 mb-3">
+            <div class="col-6">
+                <div class="small text-muted mb-1">출하번호</div>
+                <div id="detailShipmentNo" class="fw-600 text-primary-ms">-</div>
+            </div>
+            <div class="col-6">
+                <div class="small text-muted mb-1">수주번호</div>
+                <div id="detailSalesOrderNo" class="fw-600">-</div>
+            </div>
+            <div class="col-6">
+                <div class="small text-muted mb-1">수령처</div>
+                <div id="detailDeliveryAddress">-</div>
+            </div>
+            <div class="col-6">
+                <div class="small text-muted mb-1">출하일</div>
+                <div id="detailShipmentDate">-</div>
+            </div>
+            <div class="col-12">
+                <div class="small text-muted mb-1">상태</div>
+                <div id="detailStatus">-</div>
+            </div>
+        </div>
+
+        <hr>
+
+        <!-- 출하 품목 -->
+        <div class="mb-2 fw-600">출하 품목</div>
+        <div id="detailItemsLoading" class="text-center text-muted py-3" style="display:none;">
+            <div class="spinner-border spinner-border-sm me-2"></div>품목 로딩 중...
+        </div>
+        <div class="mes-table-wrapper">
+            <table class="mes-table" id="detailItemsTable">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>LOT번호</th>
+                        <th>품목코드</th>
+                        <th style="text-align:right;">출하수량</th>
+                    </tr>
+                </thead>
+                <tbody id="detailItemsTbody">
+                    <tr><td colspan="4" class="text-center text-muted py-3">품목 없음</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     상태 변경 모달
+══════════════════════════════════════════ -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="statusModalLabel"><i class="bi bi-pencil-square me-2"></i>상태 변경</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="statusModalShipmentNo">
+                <div class="mb-3">
+                    <label class="form-label fw-600">출하번호</label>
+                    <div id="statusModalShipmentNoDisplay" class="text-primary-ms fw-600"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600" for="newStatusSelect">변경할 상태</label>
+                    <select id="newStatusSelect" class="form-select">
+                        <option value="Draft">초안 (Draft)</option>
+                        <option value="Picking">피킹중 (Picking)</option>
+                        <option value="Shipped">출하완료 (Shipped)</option>
+                        <option value="Delivered">배송완료 (Delivered)</option>
+                        <option value="Cancelled">취소 (Cancelled)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSaveStatus" data-save>
+                    <i class="bi bi-check-lg me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     출하 등록 모달 (2단계)
+══════════════════════════════════════════ -->
+<div class="modal fade" id="registerModal" tabindex="-1" aria-labelledby="registerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="registerModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>출하 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- 단계 표시 -->
+                <div class="d-flex align-items-center mb-4">
+                    <div class="d-flex align-items-center" id="step1Indicator">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-700"
+                             id="step1Circle"
+                             style="width:28px;height:28px;background:var(--ms-primary);color:#fff;font-size:13px;">1</div>
+                        <span class="ms-2 fw-600 small" style="color:var(--ms-primary);">기본 정보</span>
+                    </div>
+                    <div class="mx-3" style="flex:1;height:2px;background:var(--ms-border);" id="stepConnector"></div>
+                    <div class="d-flex align-items-center" id="step2Indicator">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-700"
+                             id="step2Circle"
+                             style="width:28px;height:28px;background:#dee2e6;color:#6c757d;font-size:13px;">2</div>
+                        <span class="ms-2 small text-muted" id="step2Label">품목 추가</span>
+                    </div>
+                </div>
+
+                <!-- 1단계: 기본 정보 -->
+                <div id="regStep1">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regSalesOrderNo">수주번호 <span class="text-danger">*</span></label>
+                            <input type="text" id="regSalesOrderNo" class="form-control" placeholder="SO20250001" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regDeliveryAddress">수령처 <span class="text-danger">*</span></label>
+                            <input type="text" id="regDeliveryAddress" class="form-control" placeholder="수령처 입력" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regShipmentDate">출하일</label>
+                            <input type="date" id="regShipmentDate" class="form-control">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regAssignedTo">담당자</label>
+                            <input type="text" id="regAssignedTo" class="form-control" placeholder="담당자 이름">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2단계: 품목 추가 -->
+                <div id="regStep2" style="display:none;">
+                    <div class="d-flex gap-2 mb-3">
+                        <input type="text" id="regLotNoInput" class="form-control form-control-sm" placeholder="LOT번호 입력 후 추가" style="max-width:200px;">
+                        <input type="text" id="regItemCodeInput" class="form-control form-control-sm" placeholder="품목코드" style="max-width:160px;">
+                        <input type="number" id="regQtyInput" class="form-control form-control-sm" placeholder="수량" min="1" style="max-width:100px;">
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddItem">
+                            <i class="bi bi-plus-lg me-1"></i>추가
+                        </button>
+                    </div>
+                    <div class="mes-table-wrapper" style="max-height:280px;overflow-y:auto;">
+                        <table class="mes-table">
+                            <thead>
+                                <tr>
+                                    <th>LOT번호</th>
+                                    <th>품목코드</th>
+                                    <th style="text-align:right;">출하수량</th>
+                                    <th style="width:50px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="regItemsTbody">
+                                <tr id="trRegNoItems">
+                                    <td colspan="4" class="text-center text-muted py-3">추가된 품목이 없습니다.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="regItemsError" class="text-danger small mt-2" style="display:none;">최소 1개 이상의 품목을 추가하세요.</div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnRegBack" style="display:none;">
+                    <i class="bi bi-arrow-left me-1"></i>이전
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnRegNext">
+                    다음 <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="btnRegSave" style="display:none;" data-save>
+                    <i class="bi bi-check-lg me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    /* ── 서버 초기 데이터 ─────────────────────────────── */
+    var trendLabels = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DailyShipmentTrend.Select(x => x.Date)));
+    var trendCounts = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.DailyShipmentTrend.Select(x => x.Count)));
+
+    /* ── 차트 초기화 ──────────────────────────────────── */
+    var trendCtx = document.getElementById('chartShipmentTrend');
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: 'bar',
+            data: {
+                labels: trendLabels,
+                datasets: [{
+                    label: '출하 건수',
+                    data: trendCounts,
+                    backgroundColor: 'rgba(26,115,232,0.75)',
+                    borderColor: '#1a73e8',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) { return '출하 ' + ctx.parsed.y + '건'; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 12 } } },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: { size: 12 },
+                            callback: function(v) { return Number.isInteger(v) ? v : null; }
+                        },
+                        grid: { color: 'rgba(0,0,0,0.04)' }
+                    }
+                }
+            }
+        });
+    }
+
+    /* ── 상태 뱃지 헬퍼 ──────────────────────────────── */
+    function statusBadge(status) {
+        var map = {
+            'Draft':     ['secondary', '초안'],
+            'Picking':   ['primary',   '피킹중'],
+            'Shipped':   ['primary',   '출하완료'],
+            'Delivered': ['success',   '배송완료'],
+            'Cancelled': ['danger',    '취소']
+        };
+        var info = map[status] || ['secondary', status];
+        return '<span class="ms-badge bg-' + info[0] + ' text-white">' + info[1] + '</span>';
+    }
+
+    /* ── 테이블 렌더링 ────────────────────────────────── */
+    var allShipments = [];
+
+    function renderTable(list) {
+        var tbody = document.getElementById('shipmentTbody');
+        var countEl = document.getElementById('listCount');
+        if (!list || list.length === 0) {
+            tbody.innerHTML = '<tr id="trNoData"><td colspan="8" class="text-center text-muted py-4">' +
+                '<i class="bi bi-inbox fs-4 d-block mb-2"></i>데이터가 없습니다.</td></tr>';
+            if (countEl) countEl.textContent = '0건';
+            return;
+        }
+        if (countEl) countEl.textContent = list.length + '건';
+        var html = '';
+        list.forEach(function(s) {
+            var dateStr = s.shipmentDate ? s.shipmentDate.substring(0, 10) : '-';
+            html += '<tr style="cursor:pointer;" onclick="openDetail(\'' + s.shipmentNo + '\')">' +
+                '<td onclick="event.stopPropagation();"><input type="checkbox" class="form-check-input rowChk" value="' + s.shipmentNo + '"></td>' +
+                '<td class="fw-600 text-primary-ms">' + s.shipmentNo + '</td>' +
+                '<td>' + (s.salesOrderNo || '-') + '</td>' +
+                '<td>' + (s.deliveryAddress || '-') + '</td>' +
+                '<td>' + dateStr + '</td>' +
+                '<td style="text-align:center;">' + (s.itemCount || 0) + '</td>' +
+                '<td style="text-align:center;">' + statusBadge(s.status) + '</td>' +
+                '<td style="text-align:center;" onclick="event.stopPropagation();">' +
+                    '<button class="btn btn-outline-primary btn-sm py-0 px-2 me-1" onclick="openDetail(\'' + s.shipmentNo + '\')" title="상세">상세</button>' +
+                    '<button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="openStatusModal(\'' + s.shipmentNo + '\',\'' + s.status + '\')" title="상태변경">상태</button>' +
+                '</td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    /* ── AJAX: 목록 로드 ──────────────────────────────── */
+    function loadShipments() {
+        msFetch('/api/shipments')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                allShipments = data;
+                applyFilter();
+            })
+            .catch(function(err) {
+                console.warn('출하 목록 로드 실패:', err);
+                renderTable([]);
+            });
+    }
+
+    /* ── 필터 적용 ────────────────────────────────────── */
+    function applyFilter() {
+        var fNo   = (document.getElementById('fShipmentNo').value || '').toLowerCase();
+        var fSO   = (document.getElementById('fSalesOrderNo').value || '').toLowerCase();
+        var fAddr = (document.getElementById('fDeliveryAddress').value || '').toLowerCase();
+        var fSt   = document.getElementById('fStatus').value;
+        var fFrom = document.getElementById('fDateFrom').value;
+        var fTo   = document.getElementById('fDateTo').value;
+
+        var filtered = allShipments.filter(function(s) {
+            if (fNo   && !(s.shipmentNo    || '').toLowerCase().includes(fNo))   return false;
+            if (fSO   && !(s.salesOrderNo  || '').toLowerCase().includes(fSO))   return false;
+            if (fAddr && !(s.deliveryAddress || '').toLowerCase().includes(fAddr)) return false;
+            if (fSt   && s.status !== fSt) return false;
+            if (fFrom && s.shipmentDate && s.shipmentDate.substring(0,10) < fFrom) return false;
+            if (fTo   && s.shipmentDate && s.shipmentDate.substring(0,10) > fTo)   return false;
+            return true;
+        });
+        renderTable(filtered);
+    }
+
+    document.getElementById('btnSearch').addEventListener('click', applyFilter);
+    document.getElementById('btnReset').addEventListener('click', function() {
+        document.getElementById('fShipmentNo').value = '';
+        document.getElementById('fSalesOrderNo').value = '';
+        document.getElementById('fDeliveryAddress').value = '';
+        document.getElementById('fStatus').value = '';
+        document.getElementById('fDateFrom').value = '';
+        document.getElementById('fDateTo').value = '';
+        renderTable(allShipments);
+    });
+
+    /* ── 전체 체크박스 ────────────────────────────────── */
+    document.getElementById('chkAll').addEventListener('change', function() {
+        document.querySelectorAll('.rowChk').forEach(function(c) { c.checked = this.checked; }, this);
+    });
+
+    /* ── 출하 상세 Offcanvas ──────────────────────────── */
+    window.openDetail = function(shipmentNo) {
+        document.getElementById('detailShipmentNo').textContent = shipmentNo;
+        document.getElementById('detailSalesOrderNo').textContent = '-';
+        document.getElementById('detailDeliveryAddress').textContent = '-';
+        document.getElementById('detailShipmentDate').textContent = '-';
+        document.getElementById('detailStatus').innerHTML = '-';
+        document.getElementById('detailItemsTbody').innerHTML =
+            '<tr><td colspan="4" class="text-center text-muted py-3">로딩 중...</td></tr>';
+
+        var oc = new bootstrap.Offcanvas(document.getElementById('shipmentDetailOffcanvas'));
+        oc.show();
+
+        // 단건 조회
+        msFetch('/api/shipments/' + encodeURIComponent(shipmentNo))
+            .then(function(r) { return r.json(); })
+            .then(function(s) {
+                document.getElementById('detailSalesOrderNo').textContent = s.salesOrderNo || '-';
+                document.getElementById('detailDeliveryAddress').textContent = s.deliveryAddress || '-';
+                document.getElementById('detailShipmentDate').textContent = s.shipmentDate ? s.shipmentDate.substring(0,10) : '-';
+                document.getElementById('detailStatus').innerHTML = statusBadge(s.status);
+
+                var items = s.items || [];
+                if (items.length === 0) {
+                    document.getElementById('detailItemsTbody').innerHTML =
+                        '<tr><td colspan="4" class="text-center text-muted py-3">출하 품목 없음</td></tr>';
+                    return;
+                }
+                var html = '';
+                items.forEach(function(i) {
+                    html += '<tr><td>' + i.itemNo + '</td><td><code class="text-primary-ms">' + i.lotNo + '</code></td>' +
+                        '<td>' + i.itemCode + '</td><td style="text-align:right;">' + (i.shipQuantity || 0).toLocaleString('ko-KR') + '</td></tr>';
+                });
+                document.getElementById('detailItemsTbody').innerHTML = html;
+            })
+            .catch(function() {
+                document.getElementById('detailItemsTbody').innerHTML =
+                    '<tr><td colspan="4" class="text-center text-danger py-3">로드 실패</td></tr>';
+            });
+    };
+
+    /* ── 상태 변경 모달 ──────────────────────────────── */
+    window.openStatusModal = function(shipmentNo, currentStatus) {
+        document.getElementById('statusModalShipmentNo').value = shipmentNo;
+        document.getElementById('statusModalShipmentNoDisplay').textContent = shipmentNo;
+        document.getElementById('newStatusSelect').value = currentStatus;
+        var m = new bootstrap.Modal(document.getElementById('statusModal'));
+        m.show();
+    };
+
+    document.getElementById('btnSaveStatus').addEventListener('click', function() {
+        var no = document.getElementById('statusModalShipmentNo').value;
+        var st = document.getElementById('newStatusSelect').value;
+        msFetch('/api/shipments/' + encodeURIComponent(no) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: st })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success === false) {
+                showToast(res.message || '상태 변경 실패', 'danger');
+                return;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+            showToast(no + ' 상태가 변경되었습니다.', 'success');
+            loadShipments();
+        })
+        .catch(function() { showToast('상태 변경 중 오류가 발생했습니다.', 'danger'); });
+    });
+
+    /* ── 출하 등록 모달 ──────────────────────────────── */
+    var regStep = 1;
+    var regItems = [];
+
+    function setRegStep(step) {
+        regStep = step;
+        document.getElementById('regStep1').style.display = step === 1 ? '' : 'none';
+        document.getElementById('regStep2').style.display = step === 2 ? '' : 'none';
+        document.getElementById('btnRegBack').style.display = step === 2 ? '' : 'none';
+        document.getElementById('btnRegNext').style.display = step === 1 ? '' : 'none';
+        document.getElementById('btnRegSave').style.display = step === 2 ? '' : 'none';
+        // 단계 원형 업데이트
+        var c1 = document.getElementById('step1Circle');
+        var c2 = document.getElementById('step2Circle');
+        var lbl2 = document.getElementById('step2Label');
+        if (step === 1) {
+            c1.style.background = 'var(--ms-primary)'; c1.style.color = '#fff';
+            c2.style.background = '#dee2e6'; c2.style.color = '#6c757d';
+            lbl2.classList.remove('fw-600'); lbl2.style.color = '';
+            lbl2.classList.add('text-muted');
+        } else {
+            c1.style.background = 'var(--ms-success)'; c1.style.color = '#fff';
+            c2.style.background = 'var(--ms-primary)'; c2.style.color = '#fff';
+            lbl2.classList.remove('text-muted'); lbl2.classList.add('fw-600');
+            lbl2.style.color = 'var(--ms-primary)';
+        }
+    }
+
+    function renderRegItems() {
+        var tbody = document.getElementById('regItemsTbody');
+        if (regItems.length === 0) {
+            tbody.innerHTML = '<tr id="trRegNoItems"><td colspan="4" class="text-center text-muted py-3">추가된 품목이 없습니다.</td></tr>';
+            return;
+        }
+        var html = '';
+        regItems.forEach(function(item, idx) {
+            html += '<tr>' +
+                '<td><code class="text-primary-ms">' + item.lotNo + '</code></td>' +
+                '<td>' + item.itemCode + '</td>' +
+                '<td style="text-align:right;">' + item.shipQuantity.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:center;">' +
+                    '<button type="button" class="btn-icon btn-icon-danger" onclick="removeRegItem(' + idx + ')"><i class="bi bi-trash3"></i></button>' +
+                '</td></tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    window.removeRegItem = function(idx) {
+        regItems.splice(idx, 1);
+        renderRegItems();
+    };
+
+    document.getElementById('btnAddItem').addEventListener('click', function() {
+        var lotNo   = document.getElementById('regLotNoInput').value.trim();
+        var itemCode = document.getElementById('regItemCodeInput').value.trim();
+        var qty     = parseFloat(document.getElementById('regQtyInput').value);
+
+        if (!lotNo) { showToast('LOT번호를 입력하세요.', 'warning'); return; }
+        if (!itemCode) { showToast('품목코드를 입력하세요.', 'warning'); return; }
+        if (!qty || qty <= 0) { showToast('수량을 올바르게 입력하세요.', 'warning'); return; }
+
+        regItems.push({ lotNo: lotNo, itemCode: itemCode, shipQuantity: qty });
+        renderRegItems();
+
+        document.getElementById('regLotNoInput').value = '';
+        document.getElementById('regItemCodeInput').value = '';
+        document.getElementById('regQtyInput').value = '';
+        document.getElementById('regItemsError').style.display = 'none';
+    });
+
+    document.getElementById('btnRegNext').addEventListener('click', function() {
+        var so   = document.getElementById('regSalesOrderNo').value.trim();
+        var addr = document.getElementById('regDeliveryAddress').value.trim();
+        if (!so)   { showToast('수주번호를 입력하세요.', 'warning'); return; }
+        if (!addr) { showToast('수령처를 입력하세요.', 'warning'); return; }
+        setRegStep(2);
+    });
+
+    document.getElementById('btnRegBack').addEventListener('click', function() {
+        setRegStep(1);
+    });
+
+    document.getElementById('btnOpenRegister').addEventListener('click', function() {
+        // 폼 초기화
+        document.getElementById('regSalesOrderNo').value = '';
+        document.getElementById('regDeliveryAddress').value = '';
+        document.getElementById('regShipmentDate').value = new Date().toISOString().substring(0, 10);
+        document.getElementById('regAssignedTo').value = '';
+        document.getElementById('regLotNoInput').value = '';
+        document.getElementById('regItemCodeInput').value = '';
+        document.getElementById('regQtyInput').value = '';
+        document.getElementById('regItemsError').style.display = 'none';
+        regItems = [];
+        renderRegItems();
+        setRegStep(1);
+        var m = new bootstrap.Modal(document.getElementById('registerModal'));
+        m.show();
+    });
+
+    document.getElementById('btnRegSave').addEventListener('click', function() {
+        if (regItems.length === 0) {
+            document.getElementById('regItemsError').style.display = '';
+            return;
+        }
+        var payload = {
+            salesOrderNo:    document.getElementById('regSalesOrderNo').value.trim(),
+            deliveryAddress: document.getElementById('regDeliveryAddress').value.trim(),
+            shipmentDate:    document.getElementById('regShipmentDate').value || null,
+            assignedTo:      document.getElementById('regAssignedTo').value.trim() || null,
+            items: regItems
+        };
+
+        var btn = document.getElementById('btnRegSave');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch('/api/shipments', { method: 'POST', body: JSON.stringify(payload) })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                if (res.success === false) {
+                    showToast(res.message || '등록 실패', 'danger');
+                    return;
+                }
+                bootstrap.Modal.getInstance(document.getElementById('registerModal')).hide();
+                showToast('출하가 등록되었습니다: ' + res.shipmentNo, 'success');
+                loadShipments();
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                showToast('출하 등록 중 오류가 발생했습니다.', 'danger');
+            });
+    });
+
+    /* ── 초기 로드 ────────────────────────────────────── */
+    loadShipments();
+
+})();
+</script>
+}

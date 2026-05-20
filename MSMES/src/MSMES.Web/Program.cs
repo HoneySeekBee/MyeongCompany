@@ -30,6 +30,8 @@ builder.Services.AddScoped<CreateWorkOrderHandler>();
 builder.Services.AddScoped<UpdateWorkOrderStatusHandler>();
 builder.Services.AddScoped<CreateLotHandler>();
 builder.Services.AddScoped<GetLotHistoryHandler>();
+builder.Services.AddScoped<UpdateLotStatusHandler>();
+builder.Services.AddScoped<ListAllLotsHandler>();
 builder.Services.AddScoped<CreateShipmentHandler>();
 builder.Services.AddScoped<LoginHandler>();
 builder.Services.AddScoped<GetInventoryStatusHandler>();

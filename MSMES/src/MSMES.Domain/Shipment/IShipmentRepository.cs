@@ -4,6 +4,9 @@ public interface IShipmentRepository
 {
     Task<Shipment?> GetByNoAsync(string shipmentNo, CancellationToken ct = default);
     Task<IReadOnlyList<Shipment>> ListAsync(int skip, int take, CancellationToken ct = default);
+    Task<IReadOnlyList<Shipment>> ListAllAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<ShipmentItem>> GetItemsByShipmentNoAsync(string shipmentNo, CancellationToken ct = default);
+    Task<IReadOnlyList<ShipmentItem>> GetRecentItemsAsync(int count, CancellationToken ct = default);
     Task AddAsync(Shipment shipment, CancellationToken ct = default);
     Task UpdateAsync(Shipment shipment, CancellationToken ct = default);
     Task<string> NextNumberAsync(CancellationToken ct = default);

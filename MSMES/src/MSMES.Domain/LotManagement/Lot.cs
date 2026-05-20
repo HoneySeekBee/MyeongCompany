@@ -6,8 +6,10 @@ public class Lot : Entity
 {
     public string LotNo { get; set; } = string.Empty;
     public string ItemCode { get; set; } = string.Empty;
+    public string ItemName { get; set; } = string.Empty;
     public string WorkOrderNo { get; set; } = string.Empty;
     public decimal ProducedQuantity { get; set; }
+    public decimal DefectQuantity { get; set; }
     public DateTime ProductionDate { get; set; }
     public LotStatus Status { get; set; } = LotStatus.Created;
 

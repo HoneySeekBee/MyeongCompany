@@ -25,6 +25,15 @@ public sealed class SqlLotRepository : ILotRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<Lot>> ListAllAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<Lot>(new CommandDefinition(
+            "SELECT * FROM dbo.Lots ORDER BY CreatedAt DESC",
+            cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<IReadOnlyList<LotHistory>> GetHistoryAsync(string lotNo, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -38,8 +47,8 @@ public sealed class SqlLotRepository : ILotRepository
     {
         using var conn = _factory.Create();
         const string sql = @"INSERT INTO dbo.Lots
-            (LotNo, ItemCode, WorkOrderNo, ProducedQuantity, ProductionDate, Status, CreatedAt, CreatedBy)
-            VALUES (@LotNo,@ItemCode,@WorkOrderNo,@ProducedQuantity,@ProductionDate,@Status,@CreatedAt,@CreatedBy)";
+            (LotNo, ItemCode, ItemName, WorkOrderNo, ProducedQuantity, DefectQuantity, ProductionDate, Status, CreatedAt, CreatedBy)
+            VALUES (@LotNo,@ItemCode,@ItemName,@WorkOrderNo,@ProducedQuantity,@DefectQuantity,@ProductionDate,@Status,@CreatedAt,@CreatedBy)";
         await conn.ExecuteAsync(new CommandDefinition(sql, lot, cancellationToken: ct));
     }
 

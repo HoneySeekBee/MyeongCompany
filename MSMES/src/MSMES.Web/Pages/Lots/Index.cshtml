@@ -1,11 +1,616 @@
 @page
 @model MSMES.Web.Pages.Lots.IndexModel
+@using MSMES.Domain.LotManagement
 @{ ViewData["Title"] = "LOT 관리"; }
 
-<h1>LOT 목록</h1>
-<table style="margin-top:16px;">
-    <thead><tr><th>LOT번호</th><th>품목</th><th>작업지시</th><th>수량</th><th>생산일</th><th>상태</th></tr></thead>
-    <tbody>
-        <tr><td colspan="6">데이터 없음 (목록 페이지 틀)</td></tr>
-    </tbody>
-</table>
+@* ── 페이지 헤더 ─────────────────────────────────────── *@
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>LOT 관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active">LOT 관리</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="ms-page-header__right">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#lotCreateModal">
+            <i class="bi bi-plus-lg me-1"></i>LOT 등록
+        </button>
+    </div>
+</div>
+
+@* ── KPI 카드 4개 ────────────────────────────────────── *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">전체 LOT <i class="bi bi-tags"></i></div>
+            <div class="kpi-card__value">@Model.TotalCount</div>
+            <div class="kpi-card__sub">등록된 전체 LOT</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">생산중 <i class="bi bi-gear-fill"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-warning);">@Model.InProcessCount</div>
+            <div class="kpi-card__sub">현재 생산 진행중</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">완료 <i class="bi bi-check-circle"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-success);">@Model.ReleasedCount</div>
+            <div class="kpi-card__sub">생산 완료 (Released)</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card" style="border-left-color:#6f42c1;">
+            <div class="kpi-card__label">출하 <i class="bi bi-truck"></i></div>
+            <div class="kpi-card__value" style="color:#6f42c1;">@Model.ShippedCount</div>
+            <div class="kpi-card__sub">출하 완료 (Shipped)</div>
+        </div>
+    </div>
+</div>
+
+@* ── LOT 상태 타임라인 요약 ──────────────────────────── *@
+<div class="ms-card mb-4">
+    <div class="ms-card__body py-3">
+        <div class="d-flex align-items-center justify-content-center flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-secondary fs-6 px-3 py-2">
+                    <i class="bi bi-circle me-1"></i>생성
+                </span>
+                <span class="fw-bold text-muted">@Model.CreatedCount 건</span>
+            </div>
+            <i class="bi bi-arrow-right text-muted fs-5"></i>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+                    <i class="bi bi-gear me-1"></i>생산중
+                </span>
+                <span class="fw-bold text-muted">@Model.InProcessCount 건</span>
+            </div>
+            <i class="bi bi-arrow-right text-muted fs-5"></i>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-primary fs-6 px-3 py-2">
+                    <i class="bi bi-check2-circle me-1"></i>완료
+                </span>
+                <span class="fw-bold text-muted">@Model.ReleasedCount 건</span>
+            </div>
+            <i class="bi bi-arrow-right text-muted fs-5"></i>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge fs-6 px-3 py-2" style="background:#6f42c1;">
+                    <i class="bi bi-truck me-1"></i>출하
+                </span>
+                <span class="fw-bold text-muted">@Model.ShippedCount 건</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── 검색/필터 바 ────────────────────────────────────── *@
+<div class="ms-filter-card mb-3">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-sm-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">LOT번호</label>
+            <input type="text" id="filterLotNo" class="form-control form-control-sm" placeholder="LOT번호 검색">
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">품목코드</label>
+            <input type="text" id="filterItemCode" class="form-control form-control-sm" placeholder="품목코드 검색">
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">작업지시번호</label>
+            <input type="text" id="filterWorkOrderNo" class="form-control form-control-sm" placeholder="작업지시번호">
+        </div>
+        <div class="col-12 col-sm-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">상태</label>
+            <select id="filterStatus" class="form-select form-select-sm">
+                <option value="">전체</option>
+                <option value="Created">생성</option>
+                <option value="InProcess">생산중</option>
+                <option value="Released">완료</option>
+                <option value="Shipped">출하</option>
+                <option value="QualityHold">품질보류</option>
+                <option value="Scrapped">스크랩</option>
+            </select>
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">생산일 From</label>
+            <input type="date" id="filterDateFrom" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-lg-2">
+            <label class="form-label mb-1 text-muted-sm">생산일 To</label>
+            <input type="date" id="filterDateTo" class="form-control form-control-sm">
+        </div>
+    </div>
+    <div class="d-flex gap-2 mt-2">
+        <button type="button" class="btn btn-sm btn-primary" onclick="applyFilter()">
+            <i class="bi bi-search me-1"></i>검색
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearFilter()">
+            <i class="bi bi-x-circle me-1"></i>초기화
+        </button>
+        <span class="ms-auto text-muted-sm d-flex align-items-center" id="filterResultCount"></span>
+    </div>
+</div>
+
+@* ── LOT 목록 테이블 ─────────────────────────────────── *@
+<div class="ms-card">
+    <div class="ms-card__header">
+        <span class="ms-card__title"><i class="bi bi-table me-1"></i>LOT 목록</span>
+        <span class="text-muted-sm" id="tableCount">전체 @Model.TotalCount 건</span>
+    </div>
+    <div class="ms-card__body p-0">
+        <div class="mes-table-wrapper">
+            <table class="mes-table table table-hover mb-0" id="lotTable">
+                <thead>
+                    <tr>
+                        <th>LOT번호</th>
+                        <th>품목코드</th>
+                        <th>품목명</th>
+                        <th>작업지시번호</th>
+                        <th class="text-end">생산수량</th>
+                        <th class="text-end">불량수량</th>
+                        <th>생산일</th>
+                        <th>상태</th>
+                        <th class="text-center">이력</th>
+                        <th class="text-center">상태변경</th>
+                    </tr>
+                </thead>
+                <tbody id="lotTableBody">
+                @if (!Model.Lots.Any())
+                {
+                    <tr id="emptyRow">
+                        <td colspan="10" class="text-center text-muted py-4">
+                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>등록된 LOT가 없습니다.
+                        </td>
+                    </tr>
+                }
+                else
+                {
+                    @foreach (var lot in Model.Lots)
+                    {
+                        var badgeClass = lot.Status switch {
+                            LotStatus.Created     => "bg-secondary",
+                            LotStatus.InProcess   => "bg-warning text-dark",
+                            LotStatus.Released    => "bg-primary",
+                            LotStatus.Shipped     => "bg-success",
+                            LotStatus.QualityHold => "bg-danger",
+                            LotStatus.Scrapped    => "bg-dark",
+                            _                     => "bg-secondary"
+                        };
+                        var statusLabel = lot.Status switch {
+                            LotStatus.Created     => "생성",
+                            LotStatus.InProcess   => "생산중",
+                            LotStatus.Released    => "완료",
+                            LotStatus.Shipped     => "출하",
+                            LotStatus.QualityHold => "품질보류",
+                            LotStatus.Scrapped    => "스크랩",
+                            _                     => lot.Status.ToString()
+                        };
+                        <tr class="lot-row"
+                            data-lotno="@lot.LotNo"
+                            data-itemcode="@lot.ItemCode"
+                            data-workorderno="@lot.WorkOrderNo"
+                            data-status="@lot.Status.ToString()"
+                            data-date="@lot.ProductionDate.ToString("yyyy-MM-dd")">
+                            <td class="fw-600">@lot.LotNo</td>
+                            <td>@lot.ItemCode</td>
+                            <td>@lot.ItemName</td>
+                            <td>@lot.WorkOrderNo</td>
+                            <td class="text-end">@lot.ProducedQuantity.ToString("N0")</td>
+                            <td class="text-end @(lot.DefectQuantity > 0 ? "text-danger fw-600" : "")">
+                                @lot.DefectQuantity.ToString("N0")
+                            </td>
+                            <td>@lot.ProductionDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                <span class="badge @badgeClass ms-badge">@statusLabel</span>
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-info btn-history"
+                                        data-lotno="@lot.LotNo"
+                                        data-itemname="@lot.ItemName"
+                                        title="이력 보기">
+                                    <i class="bi bi-clock-history"></i> 이력
+                                </button>
+                            </td>
+                            <td class="text-center">
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+                                            type="button"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">
+                                        상태변경
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item status-change-item" href="#"
+                                               data-lotno="@lot.LotNo" data-status="Created">생성</a></li>
+                                        <li><a class="dropdown-item status-change-item" href="#"
+                                               data-lotno="@lot.LotNo" data-status="InProcess">생산중</a></li>
+                                        <li><a class="dropdown-item status-change-item" href="#"
+                                               data-lotno="@lot.LotNo" data-status="Released">완료</a></li>
+                                        <li><a class="dropdown-item status-change-item" href="#"
+                                               data-lotno="@lot.LotNo" data-status="Shipped">출하</a></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item status-change-item text-danger" href="#"
+                                               data-lotno="@lot.LotNo" data-status="QualityHold">품질보류</a></li>
+                                        <li><a class="dropdown-item status-change-item text-dark" href="#"
+                                               data-lotno="@lot.LotNo" data-status="Scrapped">스크랩</a></li>
+                                    </ul>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@* ── LOT 이력 Offcanvas ──────────────────────────────── *@
+<div class="offcanvas offcanvas-end" tabindex="-1" id="historyOffcanvas"
+     aria-labelledby="historyOffcanvasLabel" style="width:420px;">
+    <div class="offcanvas-header border-bottom">
+        <div>
+            <h5 class="offcanvas-title mb-0" id="historyOffcanvasLabel">
+                <i class="bi bi-clock-history me-1 text-primary"></i>LOT 이력
+            </h5>
+            <small class="text-muted" id="historySubtitle"></small>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+    </div>
+    <div class="offcanvas-body" id="historyBody">
+        <div class="text-center text-muted py-5" id="historyLoading">
+            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+            이력을 불러오는 중...
+        </div>
+        <div id="historyTimeline" style="display:none;"></div>
+    </div>
+</div>
+
+@* ── LOT 등록 Modal ──────────────────────────────────── *@
+<div class="modal fade" id="lotCreateModal" tabindex="-1" aria-labelledby="lotCreateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="lotCreateModalLabel">
+                    <i class="bi bi-plus-circle me-1 text-primary"></i>LOT 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <form id="lotCreateForm" class="needs-validation" novalidate>
+                    <div class="row g-3">
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">품목코드 <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="createItemCode" name="itemCode"
+                                   required placeholder="품목코드 입력">
+                            <div class="invalid-feedback">품목코드를 입력하세요.</div>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">품목명</label>
+                            <input type="text" class="form-control" id="createItemName" name="itemName"
+                                   placeholder="품목명 입력">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">작업지시번호</label>
+                            <input type="text" class="form-control" id="createWorkOrderNo" name="workOrderNo"
+                                   placeholder="작업지시번호 입력">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">생산수량</label>
+                            <input type="number" class="form-control" id="createProducedQty" name="producedQuantity"
+                                   value="0" min="0" step="1">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">불량수량</label>
+                            <input type="number" class="form-control" id="createDefectQty" name="defectQuantity"
+                                   value="0" min="0" step="1">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">생산일</label>
+                            <input type="date" class="form-control" id="createProductionDate" name="productionDate">
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label">등록자</label>
+                            <input type="text" class="form-control" id="createCreatedBy" name="createdBy"
+                                   placeholder="등록자 이름">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" id="btnSaveLot" data-save>
+                    <i class="bi bi-save me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    /* ── 날짜 기본값: 오늘 ──────────────────────────── */
+    var todayStr = new Date().toISOString().slice(0, 10);
+    document.getElementById('createProductionDate').value = todayStr;
+
+    /* ── 클라이언트 사이드 필터링 ─────────────────── */
+    window.applyFilter = function () {
+        var lotNo      = (document.getElementById('filterLotNo').value || '').toLowerCase().trim();
+        var itemCode   = (document.getElementById('filterItemCode').value || '').toLowerCase().trim();
+        var workOrder  = (document.getElementById('filterWorkOrderNo').value || '').toLowerCase().trim();
+        var status     = (document.getElementById('filterStatus').value || '').toLowerCase();
+        var dateFrom   = document.getElementById('filterDateFrom').value;
+        var dateTo     = document.getElementById('filterDateTo').value;
+
+        var rows = document.querySelectorAll('#lotTableBody .lot-row');
+        var visible = 0;
+
+        rows.forEach(function (row) {
+            var rLotNo     = (row.dataset.lotno || '').toLowerCase();
+            var rItemCode  = (row.dataset.itemcode || '').toLowerCase();
+            var rWorkOrder = (row.dataset.workorderno || '').toLowerCase();
+            var rStatus    = (row.dataset.status || '').toLowerCase();
+            var rDate      = row.dataset.date || '';
+
+            var match = true;
+            if (lotNo    && rLotNo.indexOf(lotNo)         === -1) match = false;
+            if (itemCode && rItemCode.indexOf(itemCode)   === -1) match = false;
+            if (workOrder && rWorkOrder.indexOf(workOrder) === -1) match = false;
+            if (status   && rStatus !== status)                    match = false;
+            if (dateFrom && rDate < dateFrom)                      match = false;
+            if (dateTo   && rDate > dateTo)                        match = false;
+
+            row.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+
+        var emptyRow = document.getElementById('emptyRow');
+        if (emptyRow) emptyRow.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
+
+        document.getElementById('filterResultCount').textContent = rows.length > 0 ? '검색 결과: ' + visible + ' 건' : '';
+    };
+
+    window.clearFilter = function () {
+        document.getElementById('filterLotNo').value = '';
+        document.getElementById('filterItemCode').value = '';
+        document.getElementById('filterWorkOrderNo').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('filterDateFrom').value = '';
+        document.getElementById('filterDateTo').value = '';
+        applyFilter();
+    };
+
+    /* 실시간 필터 (Enter 또는 change) */
+    ['filterLotNo', 'filterItemCode', 'filterWorkOrderNo', 'filterStatus',
+     'filterDateFrom', 'filterDateTo'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', applyFilter);
+            el.addEventListener('change', applyFilter);
+        }
+    });
+
+    /* ── LOT 이력 Offcanvas ────────────────────────── */
+    var historyOffcanvas = new bootstrap.Offcanvas(document.getElementById('historyOffcanvas'));
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn-history');
+        if (!btn) return;
+        var lotNo    = btn.dataset.lotno;
+        var itemName = btn.dataset.itemname;
+        openHistory(lotNo, itemName);
+    });
+
+    function openHistory(lotNo, itemName) {
+        document.getElementById('historyOffcanvasLabel').innerHTML =
+            '<i class="bi bi-clock-history me-1 text-primary"></i>LOT 이력';
+        document.getElementById('historySubtitle').textContent = lotNo + (itemName ? ' — ' + itemName : '');
+        document.getElementById('historyLoading').style.display = '';
+        document.getElementById('historyTimeline').style.display = 'none';
+        document.getElementById('historyTimeline').innerHTML = '';
+        historyOffcanvas.show();
+
+        msFetch('/api/lots/' + encodeURIComponent(lotNo) + '/history')
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                renderTimeline(data);
+            })
+            .catch(function (err) {
+                document.getElementById('historyLoading').innerHTML =
+                    '<i class="bi bi-exclamation-triangle text-danger me-1"></i>이력을 불러오지 못했습니다: ' + err.message;
+            });
+    }
+
+    function renderTimeline(items) {
+        document.getElementById('historyLoading').style.display = 'none';
+        var tl = document.getElementById('historyTimeline');
+        tl.style.display = '';
+
+        if (!items || items.length === 0) {
+            tl.innerHTML = '<p class="text-center text-muted py-4"><i class="bi bi-inbox d-block fs-4 mb-2"></i>이력이 없습니다.</p>';
+            return;
+        }
+
+        var html = '<div class="lot-timeline">';
+        items.forEach(function (item, idx) {
+            var isLast = idx === items.length - 1;
+            var dt = item.operatedAt || item.OperatedAt || '';
+            var op = item.operation || item.Operation || '';
+            var opr = item.operator || item.Operator || '';
+            var rmk = item.remarks || item.Remarks || '';
+            var dtStr = dt ? new Date(dt).toLocaleString('ko-KR', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit'
+            }) : '';
+
+            html += '<div class="tl-item' + (isLast ? ' tl-item--last' : '') + '">';
+            html += '  <div class="tl-dot"></div>';
+            html += '  <div class="tl-content">';
+            html += '    <div class="tl-time text-muted-sm">' + dtStr + '</div>';
+            html += '    <div class="tl-op fw-600">' + escHtml(op) + '</div>';
+            if (opr) html += '    <div class="text-muted-sm">작업자: ' + escHtml(opr) + '</div>';
+            if (rmk) html += '    <div class="text-muted-sm">내용: ' + escHtml(rmk) + '</div>';
+            html += '  </div>';
+            html += '</div>';
+        });
+        html += '</div>';
+        tl.innerHTML = html;
+    }
+
+    /* ── LOT 등록 저장 ──────────────────────────────── */
+    document.getElementById('btnSaveLot').addEventListener('click', function () {
+        var form = document.getElementById('lotCreateForm');
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        var payload = {
+            itemCode:        document.getElementById('createItemCode').value.trim(),
+            itemName:        document.getElementById('createItemName').value.trim(),
+            workOrderNo:     document.getElementById('createWorkOrderNo').value.trim(),
+            producedQuantity: parseFloat(document.getElementById('createProducedQty').value) || 0,
+            defectQuantity:   parseFloat(document.getElementById('createDefectQty').value) || 0,
+            productionDate:  document.getElementById('createProductionDate').value,
+            createdBy:       document.getElementById('createCreatedBy').value.trim() || '사용자'
+        };
+
+        var btn = document.getElementById('btnSaveLot');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch('/api/lots', { method: 'POST', body: JSON.stringify(payload) })
+            .then(function (res) {
+                if (!res.ok) return res.json().then(function (e) { throw new Error(e.error || 'API 오류'); });
+                return res.json();
+            })
+            .then(function (data) {
+                bootstrap.Modal.getInstance(document.getElementById('lotCreateModal')).hide();
+                form.reset();
+                form.classList.remove('was-validated');
+                document.getElementById('createProductionDate').value = new Date().toISOString().slice(0, 10);
+                showToast('LOT ' + data.lotNo + ' 이(가) 등록되었습니다.', 'success');
+                setTimeout(function () { location.reload(); }, 1200);
+            })
+            .catch(function (err) {
+                showToast('LOT 등록 실패: ' + err.message, 'danger');
+            })
+            .finally(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-save me-1"></i>저장';
+            });
+    });
+
+    /* ── 상태 변경 드롭다운 ─────────────────────────── */
+    document.addEventListener('click', function (e) {
+        var item = e.target.closest('.status-change-item');
+        if (!item) return;
+        e.preventDefault();
+        var lotNo  = item.dataset.lotno;
+        var status = item.dataset.status;
+
+        msFetch('/api/lots/' + encodeURIComponent(lotNo) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: status, operator: '사용자' })
+        })
+        .then(function (res) {
+            if (!res.ok) return res.json().then(function (e) { throw new Error(e.error || 'API 오류'); });
+            return res.json();
+        })
+        .then(function () {
+            showToast('LOT ' + lotNo + ' 상태가 변경되었습니다.', 'success');
+            setTimeout(function () { location.reload(); }, 1000);
+        })
+        .catch(function (err) {
+            showToast('상태 변경 실패: ' + err.message, 'danger');
+        });
+    });
+
+    /* ── HTML 이스케이프 유틸 ──────────────────────── */
+    function escHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /* 초기 카운트 표시 */
+    applyFilter();
+
+})();
+</script>
+}
+
+@section Styles {
+<style>
+/* ── LOT 타임라인 ──────────────────────────────────── */
+.lot-timeline {
+    position: relative;
+    padding-left: 24px;
+}
+
+.tl-item {
+    position: relative;
+    padding-bottom: 24px;
+}
+
+.tl-item::before {
+    content: '';
+    position: absolute;
+    left: -17px;
+    top: 8px;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.tl-item--last::before {
+    display: none;
+}
+
+.tl-dot {
+    position: absolute;
+    left: -22px;
+    top: 4px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--ms-primary);
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 2px var(--ms-primary);
+}
+
+.tl-item--last .tl-dot {
+    background: var(--ms-success);
+    box-shadow: 0 0 0 2px var(--ms-success);
+}
+
+.tl-content {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 10px 14px;
+    border: 1px solid var(--ms-border);
+}
+
+.tl-time {
+    font-size: 11px;
+    margin-bottom: 2px;
+}
+
+.tl-op {
+    font-size: 14px;
+    margin-bottom: 2px;
+}
+</style>
+}

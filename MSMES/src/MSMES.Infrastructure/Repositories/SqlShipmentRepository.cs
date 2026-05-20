@@ -31,6 +31,36 @@ public sealed class SqlShipmentRepository : IShipmentRepository
         return rows.ToList();
     }
 
+    public async Task<IReadOnlyList<Shipment>> ListAllAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<Shipment>(new CommandDefinition(
+            "SELECT * FROM dbo.Shipments ORDER BY ShipmentDate DESC",
+            cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<ShipmentItem>> GetItemsByShipmentNoAsync(string shipmentNo, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<ShipmentItem>(new CommandDefinition(
+            "SELECT * FROM dbo.ShipmentItems WHERE ShipmentNo=@no ORDER BY ItemNo",
+            new { no = shipmentNo }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<ShipmentItem>> GetRecentItemsAsync(int count, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<ShipmentItem>(new CommandDefinition(
+            @"SELECT TOP (@count) si.*
+              FROM dbo.ShipmentItems si
+              INNER JOIN dbo.Shipments s ON s.ShipmentNo = si.ShipmentNo
+              ORDER BY s.ShipmentDate DESC, si.ShipmentNo DESC, si.ItemNo",
+            new { count }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task AddAsync(Shipment s, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
