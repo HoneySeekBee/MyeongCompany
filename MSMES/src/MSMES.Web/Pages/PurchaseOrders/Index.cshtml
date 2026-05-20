@@ -1,12 +1,959 @@
 @page
 @model MSMES.Web.Pages.PurchaseOrders.IndexModel
-@{ ViewData["Title"] = "발주 관리"; }
+@using MSMES.Domain.PurchaseOrder
+@{ ViewData["Title"] = "발주관리"; }
 
-<h1>발주 목록</h1>
-<a class="btn" href="#">신규 발주</a>
-<table style="margin-top:16px;">
-    <thead><tr><th>발주번호</th><th>공급업체</th><th>발주일</th><th>납기일</th><th>상태</th></tr></thead>
-    <tbody>
-        <tr><td colspan="5">데이터 없음 (목록 페이지 틀)</td></tr>
-    </tbody>
-</table>
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1><i class="bi bi-cart3 me-2 text-primary-ms"></i>발주관리</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">대시보드</a></li>
+                <li class="breadcrumb-item active" aria-current="page">발주관리</li>
+            </ol>
+        </nav>
+    </div>
+    <button type="button" class="btn btn-primary" id="btnOpenCreate">
+        <i class="bi bi-plus-lg me-1"></i>발주 등록
+    </button>
+</div>
+
+<!-- KPI 카드 4개 -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-primary">
+            <div class="kpi-card__label">
+                전체 발주 건수
+                <i class="bi bi-cart3"></i>
+            </div>
+            <div class="kpi-card__value">@Model.TotalCount.ToString("N0")</div>
+            <div class="kpi-card__sub">등록된 전체 발주</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">
+                발주 대기
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="kpi-card__value">@Model.PendingCount.ToString("N0")</div>
+            <div class="kpi-card__sub">Draft / Issued 상태</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                입고 완료
+                <i class="bi bi-check2-circle"></i>
+            </div>
+            <div class="kpi-card__value">@Model.ReceivedCount.ToString("N0")</div>
+            <div class="kpi-card__sub">Received 상태</div>
+        </div>
+    </div>
+    <div class="col-6 col-xl-3">
+        <div class="kpi-card" style="border-left-color:#6f42c1;">
+            <div class="kpi-card__label">
+                이번 달 발주금액
+                <i class="bi bi-currency-dollar"></i>
+            </div>
+            <div class="kpi-card__value" style="color:#6f42c1;">
+                ₩ @Model.MonthlyAmount.ToString("N0")
+            </div>
+            <div class="kpi-card__sub">@DateTime.Today.ToString("yyyy년 MM월") 기준</div>
+        </div>
+    </div>
+</div>
+
+<!-- 차트 + 납기 임박 알림 영역 -->
+<div class="row g-3 mb-4">
+    <!-- 탭 목록 영역 (col-8) -->
+    <div class="col-12 col-lg-8">
+
+        <!-- 탭 헤더 -->
+        <ul class="nav nav-tabs mb-3" id="poTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="tab-po-list-btn" data-bs-toggle="tab"
+                        data-bs-target="#tabPoList" type="button" role="tab">
+                    <i class="bi bi-list-ul me-1"></i>발주 목록
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="tab-po-items-btn" data-bs-toggle="tab"
+                        data-bs-target="#tabPoItems" type="button" role="tab">
+                    <i class="bi bi-card-list me-1"></i>발주 품목 목록
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+
+            <!-- ─── 탭1: 발주 목록 ─── -->
+            <div class="tab-pane fade show active" id="tabPoList" role="tabpanel">
+
+                <!-- 검색 필터 -->
+                <div class="ms-filter-card mb-3">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-2">
+                            <label class="form-label mb-1 small fw-600">발주번호</label>
+                            <input type="text" id="fPoNo" class="form-control form-control-sm" placeholder="PO...">
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label class="form-label mb-1 small fw-600">공급업체명</label>
+                            <input type="text" id="fSupplier" class="form-control form-control-sm" placeholder="공급업체 검색">
+                        </div>
+                        <div class="col-12 col-md-2">
+                            <label class="form-label mb-1 small fw-600">상태</label>
+                            <select id="fStatus" class="form-select form-select-sm">
+                                <option value="">전체</option>
+                                <option value="Draft">초안</option>
+                                <option value="Issued">발행</option>
+                                <option value="PartiallyReceived">부분입고</option>
+                                <option value="Received">입고완료</option>
+                                <option value="Closed">마감</option>
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1 small fw-600">발주일 From</label>
+                            <input type="date" id="fOrderDateFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1 small fw-600">발주일 To</label>
+                            <input type="date" id="fOrderDateTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label mb-1 small fw-600">납기 From</label>
+                            <input type="date" id="fDueDateFrom" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <label class="form-label mb-1 small fw-600">납기 To</label>
+                            <input type="date" id="fDueDateTo" class="form-control form-control-sm">
+                        </div>
+                        <div class="col-12 d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" id="btnPoSearch">
+                                <i class="bi bi-search me-1"></i>검색
+                            </button>
+                            <button class="btn btn-outline-secondary btn-sm" id="btnPoReset">
+                                <i class="bi bi-x-circle me-1"></i>초기화
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 발주 목록 테이블 -->
+                <div class="ms-card">
+                    <div class="ms-card__header">
+                        <span class="ms-card__title">발주 목록</span>
+                        <span id="poListCount" class="badge bg-secondary">0건</span>
+                    </div>
+                    <div class="mes-table-wrapper">
+                        <table class="mes-table" aria-label="발주 목록">
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;"><input type="checkbox" id="chkAllPo" class="form-check-input" aria-label="전체선택"></th>
+                                    <th>발주번호</th>
+                                    <th>공급업체코드</th>
+                                    <th>공급업체명</th>
+                                    <th>발주일</th>
+                                    <th>납기일</th>
+                                    <th style="text-align:center;">품목수</th>
+                                    <th style="text-align:right;">총금액</th>
+                                    <th style="text-align:center;">상태</th>
+                                    <th style="width:130px;text-align:center;">액션</th>
+                                </tr>
+                            </thead>
+                            <tbody id="poTbody">
+                                <tr>
+                                    <td colspan="10" class="text-center text-muted py-4">
+                                        <i class="bi bi-inbox fs-4 d-block mb-2"></i>데이터가 없습니다.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ─── 탭2: 발주 품목 목록 ─── -->
+            <div class="tab-pane fade" id="tabPoItems" role="tabpanel">
+                <div class="ms-card">
+                    <div class="ms-card__header">
+                        <span class="ms-card__title">발주 품목 목록</span>
+                        <span class="badge bg-secondary">@Model.Items.Count 건</span>
+                    </div>
+                    <div class="mes-table-wrapper">
+                        <table class="mes-table" aria-label="발주 품목 목록">
+                            <thead>
+                                <tr>
+                                    <th>발주번호</th>
+                                    <th>공급업체명</th>
+                                    <th>품목코드</th>
+                                    <th>품목명</th>
+                                    <th style="text-align:right;">발주수량</th>
+                                    <th style="text-align:right;">단가</th>
+                                    <th style="text-align:right;">금액</th>
+                                    <th style="text-align:right;">입고수량</th>
+                                    <th style="width:140px;">입고율</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (!Model.Items.Any())
+                                {
+                                    <tr>
+                                        <td colspan="9" class="text-center text-muted py-4">
+                                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>발주 품목이 없습니다.
+                                        </td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    @foreach (var item in Model.Items)
+                                    {
+                                        var parentPo = Model.Orders.FirstOrDefault(o => o.PurchaseOrderNo == item.PurchaseOrderNo);
+                                        var rate = (double)item.ReceiveRate;
+                                        var progressClass = rate >= 100 ? "success" : rate >= 50 ? "warning" : "danger";
+                                        <tr>
+                                            <td><span class="fw-600 text-primary-ms">@item.PurchaseOrderNo</span></td>
+                                            <td>@(parentPo?.SupplierName ?? "-")</td>
+                                            <td>@item.ItemCode</td>
+                                            <td>@item.ItemName</td>
+                                            <td style="text-align:right;">@item.OrderQuantity.ToString("N0")</td>
+                                            <td style="text-align:right;">₩ @item.UnitPrice.ToString("N0")</td>
+                                            <td style="text-align:right;">₩ @item.Amount.ToString("N0")</td>
+                                            <td style="text-align:right;">@item.ReceivedQuantity.ToString("N0")</td>
+                                            <td>
+                                                <div class="d-flex align-items-center gap-1">
+                                                    <div class="progress flex-grow-1" style="height:8px;">
+                                                        <div class="progress-bar bg-@progressClass"
+                                                             role="progressbar"
+                                                             style="width:@(Math.Min(rate,100).ToString("F0"))%"
+                                                             aria-valuenow="@rate"
+                                                             aria-valuemin="0"
+                                                             aria-valuemax="100">
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted" style="white-space:nowrap;">@rate.ToString("F0")%</small>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /tab-content -->
+    </div>
+
+    <!-- 차트 + 납기 임박 (col-4) -->
+    <div class="col-12 col-lg-4">
+
+        <!-- 도넛 차트 -->
+        <div class="ms-card mb-3">
+            <div class="ms-card__header">
+                <span class="ms-card__title"><i class="bi bi-pie-chart me-1"></i>발주 현황</span>
+            </div>
+            <div class="ms-card__body">
+                <div style="height:200px;position:relative;">
+                    <canvas id="chartPoStatus"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 납기 7일 이내 알림 -->
+        <div class="ms-card">
+            <div class="ms-card__header">
+                <span class="ms-card__title"><i class="bi bi-alarm me-1 text-danger"></i>납기 임박 알림</span>
+                <span class="badge bg-danger">@Model.DueSoonOrders.Count</span>
+            </div>
+            <div class="ms-card__body p-0">
+                @if (!Model.DueSoonOrders.Any())
+                {
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-check-circle fs-4 d-block mb-2 text-success"></i>
+                        납기 임박 건이 없습니다.
+                    </div>
+                }
+                else
+                {
+                    <ul class="list-group list-group-flush">
+                        @foreach (var po in Model.DueSoonOrders)
+                        {
+                            var dDay = (po.DueDate.Date - DateTime.Today).Days;
+                            var dDayLabel = dDay == 0 ? "D-Day" : $"D-{dDay}";
+                            var dDayColor = dDay == 0 ? "danger" : dDay <= 3 ? "warning" : "secondary";
+                            <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-3">
+                                <div>
+                                    <div class="fw-600 small text-primary-ms">@po.PurchaseOrderNo</div>
+                                    <div class="small text-muted">@po.SupplierName</div>
+                                    <div class="small">납기: @po.DueDate.ToString("yyyy-MM-dd")</div>
+                                </div>
+                                <span class="badge bg-@dDayColor">@dDayLabel</span>
+                            </li>
+                        }
+                    </ul>
+                }
+            </div>
+        </div>
+
+    </div>
+</div><!-- /row -->
+
+
+<!-- ══════════════════════════════════════════
+     발주 상세 Offcanvas (우측 500px)
+══════════════════════════════════════════ -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="poDetailOffcanvas" style="width:500px;"
+     aria-labelledby="offcanvasPoDetailLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="offcanvasPoDetailLabel">
+            <i class="bi bi-cart3 me-2"></i>
+            <span id="detailPoNo">발주 상세</span>
+            <span id="detailPoStatusBadge" class="ms-badge ms-2"></span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="닫기"></button>
+    </div>
+    <div class="offcanvas-body">
+
+        <!-- 기본 정보 -->
+        <div class="ms-card mb-3">
+            <div class="ms-card__header"><span class="ms-card__title small">발주 기본정보</span></div>
+            <div class="ms-card__body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="small text-muted mb-1">공급업체명</div>
+                        <div id="detailSupplierName" class="fw-600">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted mb-1">공급업체코드</div>
+                        <div id="detailSupplierCode">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted mb-1">발주일</div>
+                        <div id="detailOrderDate">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted mb-1">납기일</div>
+                        <div id="detailDueDate">-</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="small text-muted mb-1">담당자</div>
+                        <div id="detailAssignedTo">-</div>
+                    </div>
+                    <div class="col-12">
+                        <div class="small text-muted mb-1">비고</div>
+                        <div id="detailNote" class="small text-muted">-</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 발주 품목 -->
+        <div class="fw-600 mb-2">발주 품목</div>
+        <div id="detailItemsLoading" class="text-center text-muted py-3" style="display:none;">
+            <div class="spinner-border spinner-border-sm me-2"></div>품목 로딩 중...
+        </div>
+        <div class="mes-table-wrapper">
+            <table class="mes-table" id="detailItemsTable">
+                <thead>
+                    <tr>
+                        <th>품목코드</th>
+                        <th>품목명</th>
+                        <th style="text-align:right;">발주수량</th>
+                        <th style="text-align:right;">단가</th>
+                        <th style="text-align:right;">금액</th>
+                        <th style="text-align:right;">입고수량</th>
+                    </tr>
+                </thead>
+                <tbody id="detailItemsTbody">
+                    <tr><td colspan="6" class="text-center text-muted py-3">품목 없음</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="text-end mt-2 pe-2">
+            <strong>총 발주금액: <span id="detailTotalAmount" class="text-primary-ms">-</span></strong>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     상태 변경 모달
+══════════════════════════════════════════ -->
+<div class="modal fade" id="poStatusModal" tabindex="-1" aria-labelledby="poStatusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="poStatusModalLabel"><i class="bi bi-pencil-square me-2"></i>상태 변경</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="statusModalPoNo">
+                <div class="mb-3">
+                    <label class="form-label fw-600">발주번호</label>
+                    <div id="statusModalPoNoDisplay" class="text-primary-ms fw-600"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-600" for="newPoStatusSelect">변경할 상태</label>
+                    <select id="newPoStatusSelect" class="form-select">
+                        <option value="Draft">초안 (Draft)</option>
+                        <option value="Issued">발행 (Issued)</option>
+                        <option value="PartiallyReceived">부분입고 (PartiallyReceived)</option>
+                        <option value="Received">입고완료 (Received)</option>
+                        <option value="Closed">마감 (Closed)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnSavePoStatus" data-save>
+                    <i class="bi bi-check-lg me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
+     발주 등록 모달 (2단계)
+══════════════════════════════════════════ -->
+<div class="modal fade" id="poRegisterModal" tabindex="-1" aria-labelledby="poRegisterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="poRegisterModalLabel">
+                    <i class="bi bi-cart-plus me-2"></i>발주 등록
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- 단계 표시 -->
+                <div class="d-flex align-items-center mb-4">
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-700"
+                             id="poStep1Circle"
+                             style="width:28px;height:28px;background:var(--ms-primary);color:#fff;font-size:13px;">1</div>
+                        <span class="ms-2 fw-600 small" id="poStep1Label" style="color:var(--ms-primary);">기본 정보</span>
+                    </div>
+                    <div class="mx-3" style="flex:1;height:2px;background:var(--ms-border);"></div>
+                    <div class="d-flex align-items-center">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center fw-700"
+                             id="poStep2Circle"
+                             style="width:28px;height:28px;background:#dee2e6;color:#6c757d;font-size:13px;">2</div>
+                        <span class="ms-2 small text-muted" id="poStep2Label">품목 추가</span>
+                    </div>
+                </div>
+
+                <!-- 1단계: 기본 정보 -->
+                <div id="poRegStep1">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regSupplierCode">공급업체코드 <span class="text-danger">*</span></label>
+                            <input type="text" id="regSupplierCode" class="form-control" placeholder="SUP-001" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regSupplierName">공급업체명 <span class="text-danger">*</span></label>
+                            <input type="text" id="regSupplierName" class="form-control" placeholder="공급업체 이름" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regDueDate">납기일 <span class="text-danger">*</span></label>
+                            <input type="date" id="regDueDate" class="form-control" required>
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label fw-600" for="regAssignedTo">담당자</label>
+                            <input type="text" id="regAssignedTo" class="form-control" placeholder="담당자 이름">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-600" for="regNote">비고</label>
+                            <textarea id="regNote" class="form-control" rows="2" placeholder="특이사항을 입력하세요"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2단계: 품목 추가 -->
+                <div id="poRegStep2" style="display:none;">
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-12 col-md-2">
+                            <label class="form-label mb-1 small fw-600">품목코드</label>
+                            <input type="text" id="regItemCode" class="form-control form-control-sm" placeholder="ITEM-001">
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <label class="form-label mb-1 small fw-600">품목명</label>
+                            <input type="text" id="regItemName" class="form-control form-control-sm" placeholder="품목명">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1 small fw-600">발주수량</label>
+                            <input type="number" id="regItemQty" class="form-control form-control-sm" placeholder="0" min="1">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1 small fw-600">단가 (₩)</label>
+                            <input type="number" id="regItemUnitPrice" class="form-control form-control-sm" placeholder="0" min="0">
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <label class="form-label mb-1 small fw-600">금액</label>
+                            <input type="text" id="regItemAmount" class="form-control form-control-sm" readonly placeholder="자동계산">
+                        </div>
+                        <div class="col-6 col-md-1">
+                            <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btnPoAddItem">
+                                <i class="bi bi-plus-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mes-table-wrapper" style="max-height:260px;overflow-y:auto;">
+                        <table class="mes-table">
+                            <thead>
+                                <tr>
+                                    <th>품목코드</th>
+                                    <th>품목명</th>
+                                    <th style="text-align:right;">발주수량</th>
+                                    <th style="text-align:right;">단가</th>
+                                    <th style="text-align:right;">금액</th>
+                                    <th style="width:40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="poRegItemsTbody">
+                                <tr id="trPoRegNoItems">
+                                    <td colspan="6" class="text-center text-muted py-3">추가된 품목이 없습니다.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-end mt-2 pe-1">
+                        <strong>총 발주금액: <span id="regTotalAmount" class="text-primary-ms">₩ 0</span></strong>
+                    </div>
+                    <div id="poRegItemsError" class="text-danger small mt-1" style="display:none;">최소 1개 이상의 품목을 추가하세요.</div>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" id="btnPoRegBack" style="display:none;">
+                    <i class="bi bi-arrow-left me-1"></i>이전
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnPoRegNext">
+                    다음 <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+                <button type="button" class="btn btn-success btn-sm" id="btnPoRegSave" style="display:none;" data-save>
+                    <i class="bi bi-check-lg me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    /* ── 서버 초기 데이터 ─────────────────────────────── */
+    var statusLabels = ['초안(Draft)', '발행(Issued)', '입고완료(Received)'];
+    var statusData   = [@Model.StatusDraft, @Model.StatusIssued, @Model.StatusReceived];
+
+    /* ── 도넛 차트 초기화 ────────────────────────────── */
+    var poCtx = document.getElementById('chartPoStatus');
+    if (poCtx) {
+        new Chart(poCtx, {
+            type: 'doughnut',
+            data: {
+                labels: statusLabels,
+                datasets: [{
+                    data: statusData,
+                    backgroundColor: ['#6c757d', '#1a73e8', '#28a745'],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: { size: 11, family: 'Noto Sans KR' }, padding: 10 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                var pct   = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
+                                return ctx.label + ': ' + ctx.parsed + '건 (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    /* ── 상태 뱃지 헬퍼 ──────────────────────────────── */
+    function poBadge(status) {
+        var map = {
+            'Draft':             ['secondary',  '초안'],
+            'Issued':            ['primary',    '발행'],
+            'PartiallyReceived': ['warning',    '부분입고'],
+            'Received':          ['success',    '입고완료'],
+            'Closed':            ['dark',       '마감']
+        };
+        var info = map[status] || ['secondary', status];
+        return '<span class="ms-badge bg-' + info[0] + ' text-white">' + info[1] + '</span>';
+    }
+
+    /* ── 테이블 렌더링 ────────────────────────────────── */
+    var allPos = [];
+    var today  = new Date().toISOString().substring(0, 10);
+    var in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+
+    function renderPoTable(list) {
+        var tbody    = document.getElementById('poTbody');
+        var countEl  = document.getElementById('poListCount');
+        if (!list || list.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">' +
+                '<i class="bi bi-inbox fs-4 d-block mb-2"></i>데이터가 없습니다.</td></tr>';
+            if (countEl) countEl.textContent = '0건';
+            return;
+        }
+        if (countEl) countEl.textContent = list.length + '건';
+
+        var html = '';
+        list.forEach(function (po) {
+            var dueSoon  = po.dueDate >= today && po.dueDate <= in7Days;
+            var overdue  = po.dueDate < today && po.status !== 'Received' && po.status !== 'Closed';
+            var dueCls   = overdue ? 'style="background:rgba(220,53,69,0.06);"' : '';
+            var dueLbl   = (dueSoon || overdue)
+                ? '<i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="납기 임박/초과"></i>'
+                : '';
+            var dueDateCls = (dueSoon || overdue) ? ' style="color:#dc3545;font-weight:600;"' : '';
+            var totalAmt = po.totalAmount ? po.totalAmount.toLocaleString('ko-KR') : '0';
+
+            html += '<tr ' + dueCls + '>' +
+                '<td onclick="event.stopPropagation();"><input type="checkbox" class="form-check-input rowPoChk" value="' + po.purchaseOrderNo + '"></td>' +
+                '<td><a href="#" class="fw-600 text-primary-ms" onclick="openPoDetail(\'' + po.purchaseOrderNo + '\'); return false;">' + po.purchaseOrderNo + '</a></td>' +
+                '<td>' + (po.supplierCode || '-') + '</td>' +
+                '<td>' + (po.supplierName || '-') + '</td>' +
+                '<td>' + (po.orderDate ? po.orderDate.substring(0,10) : '-') + '</td>' +
+                '<td' + dueDateCls + '>' + (po.dueDate ? po.dueDate.substring(0,10) : '-') + dueLbl + '</td>' +
+                '<td style="text-align:center;">' + (po.itemCount || 0) + '</td>' +
+                '<td style="text-align:right;">₩ ' + totalAmt + '</td>' +
+                '<td style="text-align:center;">' + poBadge(po.status) + '</td>' +
+                '<td style="text-align:center;" onclick="event.stopPropagation();">' +
+                    '<button class="btn btn-outline-primary btn-sm py-0 px-2 me-1" onclick="openPoDetail(\'' + po.purchaseOrderNo + '\')" title="상세">상세</button>' +
+                    '<button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="openPoStatusModal(\'' + po.purchaseOrderNo + '\',\'' + po.status + '\')" title="상태변경">상태</button>' +
+                '</td>' +
+            '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    /* ── AJAX: 발주 목록 로드 ────────────────────────── */
+    function loadPos() {
+        msFetch('/api/purchase-orders')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                allPos = data;
+                applyPoFilter();
+            })
+            .catch(function (err) {
+                console.warn('발주 목록 로드 실패:', err);
+                renderPoTable([]);
+            });
+    }
+
+    /* ── 필터 적용 ────────────────────────────────────── */
+    function applyPoFilter() {
+        var fNo   = (document.getElementById('fPoNo').value    || '').toLowerCase();
+        var fSup  = (document.getElementById('fSupplier').value || '').toLowerCase();
+        var fSt   = document.getElementById('fStatus').value;
+        var fOF   = document.getElementById('fOrderDateFrom').value;
+        var fOT   = document.getElementById('fOrderDateTo').value;
+        var fDF   = document.getElementById('fDueDateFrom').value;
+        var fDT   = document.getElementById('fDueDateTo').value;
+
+        var filtered = allPos.filter(function (po) {
+            if (fNo  && !(po.purchaseOrderNo || '').toLowerCase().includes(fNo))  return false;
+            if (fSup && !(po.supplierName    || '').toLowerCase().includes(fSup)) return false;
+            if (fSt  && po.status !== fSt) return false;
+            var od = po.orderDate ? po.orderDate.substring(0,10) : '';
+            var dd = po.dueDate   ? po.dueDate.substring(0,10)   : '';
+            if (fOF && od < fOF) return false;
+            if (fOT && od > fOT) return false;
+            if (fDF && dd < fDF) return false;
+            if (fDT && dd > fDT) return false;
+            return true;
+        });
+        renderPoTable(filtered);
+    }
+
+    document.getElementById('btnPoSearch').addEventListener('click', applyPoFilter);
+    document.getElementById('btnPoReset').addEventListener('click', function () {
+        ['fPoNo','fSupplier','fStatus','fOrderDateFrom','fOrderDateTo','fDueDateFrom','fDueDateTo']
+            .forEach(function (id) { document.getElementById(id).value = ''; });
+        renderPoTable(allPos);
+    });
+
+    /* ── 전체 체크박스 ────────────────────────────────── */
+    document.getElementById('chkAllPo').addEventListener('change', function () {
+        document.querySelectorAll('.rowPoChk').forEach(function (c) { c.checked = this.checked; }, this);
+    });
+
+    /* ── 발주 상세 Offcanvas ──────────────────────────── */
+    window.openPoDetail = function (poNo) {
+        document.getElementById('detailPoNo').textContent = poNo;
+        document.getElementById('detailPoStatusBadge').innerHTML = '';
+        document.getElementById('detailSupplierName').textContent = '-';
+        document.getElementById('detailSupplierCode').textContent = '-';
+        document.getElementById('detailOrderDate').textContent = '-';
+        document.getElementById('detailDueDate').textContent = '-';
+        document.getElementById('detailAssignedTo').textContent = '-';
+        document.getElementById('detailNote').textContent = '-';
+        document.getElementById('detailTotalAmount').textContent = '-';
+        document.getElementById('detailItemsTbody').innerHTML =
+            '<tr><td colspan="6" class="text-center text-muted py-3">로딩 중...</td></tr>';
+
+        var oc = new bootstrap.Offcanvas(document.getElementById('poDetailOffcanvas'));
+        oc.show();
+
+        msFetch('/api/purchase-orders/' + encodeURIComponent(poNo))
+            .then(function (r) { return r.json(); })
+            .then(function (po) {
+                document.getElementById('detailPoStatusBadge').innerHTML = poBadge(po.status);
+                document.getElementById('detailSupplierName').textContent = po.supplierName || '-';
+                document.getElementById('detailSupplierCode').textContent = po.supplierCode || '-';
+                document.getElementById('detailOrderDate').textContent    = po.orderDate ? po.orderDate.substring(0,10) : '-';
+                document.getElementById('detailDueDate').textContent      = po.dueDate   ? po.dueDate.substring(0,10)   : '-';
+                document.getElementById('detailAssignedTo').textContent   = po.assignedTo || '-';
+                document.getElementById('detailNote').textContent         = po.note       || '-';
+                document.getElementById('detailTotalAmount').textContent  =
+                    '₩ ' + (po.totalAmount || 0).toLocaleString('ko-KR');
+
+                var items = po.items || [];
+                if (items.length === 0) {
+                    document.getElementById('detailItemsTbody').innerHTML =
+                        '<tr><td colspan="6" class="text-center text-muted py-3">발주 품목 없음</td></tr>';
+                    return;
+                }
+                var html = '';
+                items.forEach(function (i) {
+                    html += '<tr>' +
+                        '<td>' + i.itemCode + '</td>' +
+                        '<td>' + i.itemName + '</td>' +
+                        '<td style="text-align:right;">' + (i.orderQuantity || 0).toLocaleString('ko-KR') + '</td>' +
+                        '<td style="text-align:right;">₩ ' + (i.unitPrice || 0).toLocaleString('ko-KR') + '</td>' +
+                        '<td style="text-align:right;">₩ ' + (i.amount || 0).toLocaleString('ko-KR') + '</td>' +
+                        '<td style="text-align:right;">' + (i.receivedQuantity || 0).toLocaleString('ko-KR') + '</td>' +
+                    '</tr>';
+                });
+                document.getElementById('detailItemsTbody').innerHTML = html;
+            })
+            .catch(function () {
+                document.getElementById('detailItemsTbody').innerHTML =
+                    '<tr><td colspan="6" class="text-center text-danger py-3">로드 실패</td></tr>';
+            });
+    };
+
+    /* ── 상태 변경 모달 ──────────────────────────────── */
+    window.openPoStatusModal = function (poNo, currentStatus) {
+        document.getElementById('statusModalPoNo').value = poNo;
+        document.getElementById('statusModalPoNoDisplay').textContent = poNo;
+        document.getElementById('newPoStatusSelect').value = currentStatus;
+        var m = new bootstrap.Modal(document.getElementById('poStatusModal'));
+        m.show();
+    };
+
+    document.getElementById('btnSavePoStatus').addEventListener('click', function () {
+        var no = document.getElementById('statusModalPoNo').value;
+        var st = document.getElementById('newPoStatusSelect').value;
+        msFetch('/api/purchase-orders/' + encodeURIComponent(no) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: st })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res.success === false) {
+                showToast(res.message || '상태 변경 실패', 'danger');
+                return;
+            }
+            bootstrap.Modal.getInstance(document.getElementById('poStatusModal')).hide();
+            showToast(no + ' 상태가 변경되었습니다.', 'success');
+            loadPos();
+        })
+        .catch(function () { showToast('상태 변경 중 오류가 발생했습니다.', 'danger'); });
+    });
+
+    /* ── 발주 등록 모달 ──────────────────────────────── */
+    var poRegStep  = 1;
+    var poRegItems = [];
+
+    function setPoRegStep(step) {
+        poRegStep = step;
+        document.getElementById('poRegStep1').style.display  = step === 1 ? '' : 'none';
+        document.getElementById('poRegStep2').style.display  = step === 2 ? '' : 'none';
+        document.getElementById('btnPoRegBack').style.display  = step === 2 ? '' : 'none';
+        document.getElementById('btnPoRegNext').style.display  = step === 1 ? '' : 'none';
+        document.getElementById('btnPoRegSave').style.display  = step === 2 ? '' : 'none';
+
+        var c1 = document.getElementById('poStep1Circle');
+        var c2 = document.getElementById('poStep2Circle');
+        var l2 = document.getElementById('poStep2Label');
+        if (step === 1) {
+            c1.style.background = 'var(--ms-primary)'; c1.style.color = '#fff';
+            c2.style.background = '#dee2e6'; c2.style.color = '#6c757d';
+            l2.classList.remove('fw-600'); l2.style.color = '';
+            l2.classList.add('text-muted');
+        } else {
+            c1.style.background = 'var(--ms-success)'; c1.style.color = '#fff';
+            c2.style.background = 'var(--ms-primary)'; c2.style.color = '#fff';
+            l2.classList.remove('text-muted'); l2.classList.add('fw-600');
+            l2.style.color = 'var(--ms-primary)';
+        }
+    }
+
+    function calcPoRegTotal() {
+        var total = poRegItems.reduce(function (s, i) { return s + i.orderQuantity * i.unitPrice; }, 0);
+        document.getElementById('regTotalAmount').textContent = '₩ ' + total.toLocaleString('ko-KR');
+    }
+
+    function renderPoRegItems() {
+        var tbody = document.getElementById('poRegItemsTbody');
+        if (poRegItems.length === 0) {
+            tbody.innerHTML = '<tr id="trPoRegNoItems"><td colspan="6" class="text-center text-muted py-3">추가된 품목이 없습니다.</td></tr>';
+            calcPoRegTotal();
+            return;
+        }
+        var html = '';
+        poRegItems.forEach(function (item, idx) {
+            var amt = item.orderQuantity * item.unitPrice;
+            html += '<tr>' +
+                '<td>' + item.itemCode + '</td>' +
+                '<td>' + item.itemName + '</td>' +
+                '<td style="text-align:right;">' + item.orderQuantity.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:right;">₩ ' + item.unitPrice.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:right;">₩ ' + amt.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:center;">' +
+                    '<button type="button" class="btn-icon btn-icon-danger" onclick="removePoRegItem(' + idx + ')"><i class="bi bi-trash3"></i></button>' +
+                '</td></tr>';
+        });
+        tbody.innerHTML = html;
+        calcPoRegTotal();
+    }
+
+    window.removePoRegItem = function (idx) {
+        poRegItems.splice(idx, 1);
+        renderPoRegItems();
+    };
+
+    /* 금액 자동계산 */
+    ['regItemQty', 'regItemUnitPrice'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', function () {
+            var qty   = parseFloat(document.getElementById('regItemQty').value) || 0;
+            var price = parseFloat(document.getElementById('regItemUnitPrice').value) || 0;
+            document.getElementById('regItemAmount').value = '₩ ' + (qty * price).toLocaleString('ko-KR');
+        });
+    });
+
+    document.getElementById('btnPoAddItem').addEventListener('click', function () {
+        var code  = document.getElementById('regItemCode').value.trim();
+        var name  = document.getElementById('regItemName').value.trim();
+        var qty   = parseFloat(document.getElementById('regItemQty').value);
+        var price = parseFloat(document.getElementById('regItemUnitPrice').value);
+
+        if (!code)       { showToast('품목코드를 입력하세요.', 'warning'); return; }
+        if (!name)       { showToast('품목명을 입력하세요.', 'warning'); return; }
+        if (!qty || qty <= 0)    { showToast('발주수량을 올바르게 입력하세요.', 'warning'); return; }
+        if (price < 0 || isNaN(price)) { showToast('단가를 올바르게 입력하세요.', 'warning'); return; }
+
+        poRegItems.push({ itemCode: code, itemName: name, orderQuantity: qty, unitPrice: price || 0 });
+        renderPoRegItems();
+
+        document.getElementById('regItemCode').value = '';
+        document.getElementById('regItemName').value = '';
+        document.getElementById('regItemQty').value = '';
+        document.getElementById('regItemUnitPrice').value = '';
+        document.getElementById('regItemAmount').value = '';
+        document.getElementById('poRegItemsError').style.display = 'none';
+    });
+
+    document.getElementById('btnPoRegNext').addEventListener('click', function () {
+        var code = document.getElementById('regSupplierCode').value.trim();
+        var name = document.getElementById('regSupplierName').value.trim();
+        var due  = document.getElementById('regDueDate').value;
+        if (!code) { showToast('공급업체코드를 입력하세요.', 'warning'); return; }
+        if (!name) { showToast('공급업체명을 입력하세요.', 'warning'); return; }
+        if (!due)  { showToast('납기일을 선택하세요.', 'warning'); return; }
+        setPoRegStep(2);
+    });
+
+    document.getElementById('btnPoRegBack').addEventListener('click', function () {
+        setPoRegStep(1);
+    });
+
+    document.getElementById('btnOpenCreate').addEventListener('click', function () {
+        document.getElementById('regSupplierCode').value = '';
+        document.getElementById('regSupplierName').value = '';
+        document.getElementById('regDueDate').value = '';
+        document.getElementById('regAssignedTo').value = '';
+        document.getElementById('regNote').value = '';
+        document.getElementById('regItemCode').value = '';
+        document.getElementById('regItemName').value = '';
+        document.getElementById('regItemQty').value = '';
+        document.getElementById('regItemUnitPrice').value = '';
+        document.getElementById('regItemAmount').value = '';
+        document.getElementById('poRegItemsError').style.display = 'none';
+        poRegItems = [];
+        renderPoRegItems();
+        setPoRegStep(1);
+        var m = new bootstrap.Modal(document.getElementById('poRegisterModal'));
+        m.show();
+    });
+
+    document.getElementById('btnPoRegSave').addEventListener('click', function () {
+        if (poRegItems.length === 0) {
+            document.getElementById('poRegItemsError').style.display = '';
+            return;
+        }
+        var payload = {
+            supplierCode: document.getElementById('regSupplierCode').value.trim(),
+            supplierName: document.getElementById('regSupplierName').value.trim(),
+            orderDate:    new Date().toISOString().substring(0, 10),
+            dueDate:      document.getElementById('regDueDate').value,
+            assignedTo:   document.getElementById('regAssignedTo').value.trim() || null,
+            note:         document.getElementById('regNote').value.trim() || null,
+            items: poRegItems
+        };
+
+        var btn = document.getElementById('btnPoRegSave');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch('/api/purchase-orders', { method: 'POST', body: JSON.stringify(payload) })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                if (res.success === false) {
+                    showToast(res.message || '등록 실패', 'danger');
+                    return;
+                }
+                bootstrap.Modal.getInstance(document.getElementById('poRegisterModal')).hide();
+                showToast('발주가 등록되었습니다: ' + res.purchaseOrderNo, 'success');
+                loadPos();
+            })
+            .catch(function () {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                showToast('발주 등록 중 오류가 발생했습니다.', 'danger');
+            });
+    });
+
+    /* ── 초기 로드 ────────────────────────────────────── */
+    loadPos();
+
+})();
+</script>
+}

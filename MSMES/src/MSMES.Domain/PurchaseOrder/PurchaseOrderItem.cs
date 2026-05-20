@@ -10,5 +10,7 @@ public class PurchaseOrderItem : Entity
     public string ItemName { get; set; } = string.Empty;
     public decimal OrderQuantity { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal ReceivedQuantity { get; set; }
     public decimal Amount => OrderQuantity * UnitPrice;
+    public decimal ReceiveRate => OrderQuantity > 0 ? ReceivedQuantity / OrderQuantity * 100m : 0m;
 }

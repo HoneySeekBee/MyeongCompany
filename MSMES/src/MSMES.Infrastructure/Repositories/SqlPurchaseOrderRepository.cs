@@ -23,6 +23,27 @@ public sealed class SqlPurchaseOrderRepository : IPurchaseOrderRepository
         return head;
     }
 
+    public async Task<PurchaseOrder?> GetWithItemsAsync(string purchaseOrderNo, CancellationToken ct = default)
+        => await GetByNoAsync(purchaseOrderNo, ct);
+
+    public async Task<IReadOnlyList<PurchaseOrder>> ListAllAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<PurchaseOrder>(new CommandDefinition(
+            "SELECT * FROM dbo.PurchaseOrders ORDER BY OrderDate DESC",
+            cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<PurchaseOrderItem>> ListAllItemsAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<PurchaseOrderItem>(new CommandDefinition(
+            "SELECT * FROM dbo.PurchaseOrderItems ORDER BY PurchaseOrderNo, ItemNo",
+            cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<IReadOnlyList<PurchaseOrder>> ListAsync(int skip, int take, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -38,8 +59,8 @@ public sealed class SqlPurchaseOrderRepository : IPurchaseOrderRepository
         conn.Open();
         using var tx = conn.BeginTransaction();
         const string sql = @"INSERT INTO dbo.PurchaseOrders
-            (PurchaseOrderNo, SupplierCode, SupplierName, OrderDate, DueDate, Status, CreatedAt, CreatedBy)
-            VALUES (@PurchaseOrderNo,@SupplierCode,@SupplierName,@OrderDate,@DueDate,@Status,@CreatedAt,@CreatedBy)";
+            (PurchaseOrderNo, SupplierCode, SupplierName, OrderDate, DueDate, Status, AssignedTo, Note, CreatedAt, CreatedBy)
+            VALUES (@PurchaseOrderNo,@SupplierCode,@SupplierName,@OrderDate,@DueDate,@Status,@AssignedTo,@Note,@CreatedAt,@CreatedBy)";
         await conn.ExecuteAsync(new CommandDefinition(sql, po, tx, cancellationToken: ct));
         const string sqlI = @"INSERT INTO dbo.PurchaseOrderItems
             (PurchaseOrderNo, ItemNo, ItemCode, ItemName, OrderQuantity, UnitPrice, CreatedAt, CreatedBy)
@@ -58,7 +79,8 @@ public sealed class SqlPurchaseOrderRepository : IPurchaseOrderRepository
     {
         using var conn = _factory.Create();
         const string sql = @"UPDATE dbo.PurchaseOrders SET SupplierCode=@SupplierCode, SupplierName=@SupplierName,
-            OrderDate=@OrderDate, DueDate=@DueDate, Status=@Status, UpdatedAt=SYSUTCDATETIME()
+            OrderDate=@OrderDate, DueDate=@DueDate, Status=@Status, AssignedTo=@AssignedTo, Note=@Note,
+            UpdatedAt=SYSUTCDATETIME()
             WHERE PurchaseOrderNo=@PurchaseOrderNo";
         await conn.ExecuteAsync(new CommandDefinition(sql, po, cancellationToken: ct));
     }

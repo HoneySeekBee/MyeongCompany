@@ -10,6 +10,8 @@ public class PurchaseOrder : Entity
     public DateTime OrderDate { get; set; }
     public DateTime DueDate { get; set; }
     public PurchaseOrderStatus Status { get; set; } = PurchaseOrderStatus.Draft;
+    public string? AssignedTo { get; set; }
+    public string? Note { get; set; }
     public List<PurchaseOrderItem> Items { get; set; } = new();
 
     public decimal TotalAmount => Items.Sum(i => i.Amount);

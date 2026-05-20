@@ -10,7 +10,9 @@ public sealed record CreatePurchaseOrderCommand(
     DateTime OrderDate,
     DateTime DueDate,
     IReadOnlyList<CreatePurchaseOrderItemDto> Items,
-    string CreatedBy);
+    string CreatedBy,
+    string? AssignedTo = null,
+    string? Note = null);
 
 public sealed class CreatePurchaseOrderHandler
 {
@@ -28,6 +30,8 @@ public sealed class CreatePurchaseOrderHandler
             OrderDate = cmd.OrderDate,
             DueDate = cmd.DueDate,
             Status = PurchaseOrderStatus.Draft,
+            AssignedTo = cmd.AssignedTo,
+            Note = cmd.Note,
             CreatedBy = cmd.CreatedBy,
             CreatedAt = DateTime.UtcNow
         };
