@@ -45,7 +45,7 @@
     <div class="col-6 col-xl-3">
         <div class="kpi-card kpi-warning" id="kpiLowStock" style="cursor:pointer;" title="부족 재고 필터">
             <div class="kpi-card__label">
-                부족 재고
+                부족 경고
                 <i class="bi bi-exclamation-triangle"></i>
             </div>
             <div class="kpi-card__value" style="color:#e67e22;">@Model.LowStockCount</div>
@@ -53,13 +53,20 @@
         </div>
     </div>
     <div class="col-6 col-xl-3">
-        <div class="kpi-card kpi-danger" id="kpiOutOfStock" style="cursor:pointer;" title="소진 재고 필터">
+        <div class="kpi-card kpi-danger" id="kpiCritical" style="cursor:pointer;" title="위험 재고 필터">
             <div class="kpi-card__label">
-                소진 품목
-                <i class="bi bi-x-circle"></i>
+                위험 품목
+                <i class="bi bi-exclamation-octagon-fill"></i>
             </div>
-            <div class="kpi-card__value" style="color:var(--ms-danger);">@Model.OutOfStockCount</div>
-            <div class="kpi-card__sub">재고 0 이하 <i class="bi bi-funnel-fill ms-1 text-danger"></i></div>
+            <div class="kpi-card__value" style="color:var(--ms-danger);">@Model.CriticalCount</div>
+            <div class="kpi-card__sub">
+                안전재고 50% 이하
+                <i class="bi bi-funnel-fill ms-1 text-danger"></i>
+                @if (Model.OutOfStockCount > 0)
+                {
+                    <span class="ms-1 text-muted-sm">(소진 @Model.OutOfStockCount)</span>
+                }
+            </div>
         </div>
     </div>
 </div>
@@ -207,6 +214,14 @@
                             <option value="OutOfStock">소진</option>
                         </select>
                     </div>
+                    <div class="col-12 col-sm-6 col-md-3">
+                        <label class="form-label mb-1 text-muted-sm">창고위치</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                            <input type="text" id="stockLocation" class="form-control"
+                                   placeholder="위치 검색 (예: A-01)" autocomplete="off" />
+                        </div>
+                    </div>
                     <div class="col-12 col-sm-6 col-md-2 d-flex gap-2">
                         <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btnStockReset">
                             <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
@@ -214,6 +229,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 위험/부족 인라인 배너 -->
+            @if (Model.LowStockItems.Any())
+            {
+                <div class="alert alert-warning d-flex align-items-start gap-3 mx-3 mt-3 mb-0 py-2" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 mt-1"></i>
+                    <div class="flex-grow-1">
+                        <span class="fw-semibold">재고 부족 경고 — @(Model.LowStockItems.Count)개 품목</span>
+                        <div class="mt-1 d-flex flex-wrap gap-1">
+                            @foreach (var item in Model.LowStockItems.Take(6))
+                            {
+                                <span class="badge @(item.IsCriticalStock ? "bg-danger" : "bg-warning text-dark")">
+                                    @item.ItemName
+                                    <span class="ms-1 opacity-75">(@item.CurrentStock.ToString("N0")/@item.SafetyStock.ToString("N0") @item.Unit)</span>
+                                    @if (!string.IsNullOrWhiteSpace(item.WarehouseLocation))
+                                    {
+                                        <span class="ms-1 opacity-75">· @item.WarehouseLocation</span>
+                                    }
+                                </span>
+                            }
+                            @if (Model.LowStockItems.Count > 6)
+                            {
+                                <span class="text-muted small align-self-center">외 @(Model.LowStockItems.Count - 6)개</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
 
             <!-- 테이블 -->
             <div class="mes-table-wrapper p-3">
@@ -223,10 +266,11 @@
                             <th>품목코드</th>
                             <th>품목명</th>
                             <th>창고</th>
+                            <th>창고위치</th>
                             <th class="text-end">현재재고</th>
                             <th class="text-end">안전재고</th>
                             <th>단위</th>
-                            <th style="min-width:120px;">재고비율</th>
+                            <th style="min-width:130px;">재고건강도</th>
                             <th>상태</th>
                             <th class="text-center">액션</th>
                         </tr>
@@ -234,51 +278,73 @@
                     <tbody id="stockTbody">
                     @foreach (var inv in Model.Inventories)
                     {
-                        var ratio = inv.SafetyStock > 0
-                            ? Math.Min(100m, Math.Round(inv.CurrentStock / inv.SafetyStock * 100m, 1))
-                            : 100m;
-                        var barColor = ratio >= 100m ? "bg-success"
-                            : ratio >= 50m ? "bg-warning"
-                            : "bg-danger";
-                        var rowClass = inv.Status switch
-                        {
-                            InventoryStatus.OutOfStock => "table-danger",
-                            InventoryStatus.LowStock   => "table-warning",
-                            _                          => ""
-                        };
+                        // Health bar: MaxStock-based (StockHealthPct), fallback to SafetyStock ratio
+                        var healthPct  = (int)inv.StockHealthPct;
+                        var barColor   = inv.IsCriticalStock ? "bg-danger"
+                                       : inv.IsLowStock      ? "bg-warning"
+                                       : healthPct >= 50     ? "bg-success"
+                                       :                       "bg-warning";
+                        var healthText = inv.IsCriticalStock ? "text-danger fw-bold"
+                                       : inv.IsLowStock      ? "text-warning fw-semibold"
+                                       :                       "text-success";
+                        var rowClass   = inv.IsCriticalStock          ? "table-danger"
+                                       : inv.Status == InventoryStatus.OutOfStock ? "table-danger"
+                                       : inv.IsLowStock               ? "table-warning"
+                                       :                                "";
                         var statusBadge = inv.Status switch
                         {
                             InventoryStatus.OutOfStock =>
                                 "<span class=\"ms-badge status-badge-cancelled\">소진</span>",
+                            InventoryStatus.LowStock when inv.IsCriticalStock =>
+                                "<span class=\"ms-badge\" style=\"background:#c0392b;color:#fff;\"><i class=\"bi bi-exclamation-octagon-fill me-1\"></i>위험</span>",
                             InventoryStatus.LowStock =>
                                 "<span class=\"ms-badge\" style=\"background:#e67e22;color:#fff;\">부족</span>",
                             _ =>
                                 "<span class=\"ms-badge status-badge-completed\">정상</span>"
                         };
-                        var statusVal = inv.Status.ToString();
+                        var statusVal  = inv.Status.ToString();
+                        var locDisplay = string.IsNullOrWhiteSpace(inv.WarehouseLocation) ? "-" : inv.WarehouseLocation;
                         <tr class="stock-row @rowClass"
                             data-code="@inv.ItemCode.ToLower()"
                             data-name="@inv.ItemName.ToLower()"
                             data-warehouse="@inv.WarehouseCode"
-                            data-status="@statusVal">
+                            data-location="@(inv.WarehouseLocation?.ToLower() ?? "")"
+                            data-status="@statusVal"
+                            data-critical="@(inv.IsCriticalStock ? "true" : "false")">
                             <td class="fw-600 text-primary-ms">@inv.ItemCode</td>
                             <td>@inv.ItemName</td>
                             <td>
                                 <span class="ms-badge" style="background:#e8f0fe;color:#1a73e8;">@inv.WarehouseCode</span>
+                            </td>
+                            <td class="text-muted-sm" style="font-size:12px;">
+                                @if (!string.IsNullOrWhiteSpace(inv.WarehouseLocation))
+                                {
+                                    <span><i class="bi bi-geo-alt me-1 text-secondary"></i>@inv.WarehouseLocation</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">-</span>
+                                }
                             </td>
                             <td class="text-end fw-600">@inv.CurrentStock.ToString("N2")</td>
                             <td class="text-end text-muted-sm">@inv.SafetyStock.ToString("N2")</td>
                             <td>@inv.Unit</td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    <div class="ms-progress flex-grow-1">
+                                    <div class="ms-progress flex-grow-1" style="min-width:60px;">
                                         <div class="ms-progress-bar @barColor"
-                                             style="width:@(ratio.ToString("F1", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                                             style="width:@(healthPct.ToString(System.Globalization.CultureInfo.InvariantCulture))%;"></div>
                                     </div>
-                                    <small class="text-muted-sm flex-shrink-0" style="min-width:36px;text-align:right;">
-                                        @(ratio.ToString("F0"))%
+                                    <small class="@healthText flex-shrink-0" style="min-width:38px;text-align:right;">
+                                        @healthPct%
                                     </small>
                                 </div>
+                                @if (inv.MaxStock > 0)
+                                {
+                                    <div class="text-muted-sm mt-1" style="font-size:10px;">
+                                        @inv.CurrentStock.ToString("N0") / @inv.MaxStock.ToString("N0")
+                                    </div>
+                                }
                             </td>
                             <td>@Html.Raw(statusBadge)</td>
                             <td class="text-center">
@@ -320,7 +386,7 @@
                     @if (!Model.Inventories.Any())
                     {
                         <tr id="stockEmpty">
-                            <td colspan="9" class="text-center py-4 text-muted-sm">
+                            <td colspan="10" class="text-center py-4 text-muted-sm">
                                 <i class="bi bi-inbox fs-3 d-block mb-2"></i>데이터가 없습니다.
                             </td>
                         </tr>
@@ -579,34 +645,50 @@
     /* ── KPI 카드 클릭 필터 ────────────────────── */
     document.getElementById('kpiLowStock').addEventListener('click', function () {
         document.getElementById('stockStatus').value = 'LowStock';
+        document.getElementById('stockCritical').value = '';
         filterStockTable();
         document.getElementById('tab-stock').click();
     });
-    document.getElementById('kpiOutOfStock').addEventListener('click', function () {
-        document.getElementById('stockStatus').value = 'OutOfStock';
+    document.getElementById('kpiCritical').addEventListener('click', function () {
+        // Show only critical items (IsCriticalStock) — filter via data-critical attribute
+        document.getElementById('stockStatus').value = '';
+        document.getElementById('stockCritical').value = 'true';
         filterStockTable();
         document.getElementById('tab-stock').click();
     });
 
     /* ── 재고 현황 필터 ────────────────────────── */
+    // Hidden input to carry critical-only flag set by KPI card click
+    (function () {
+        var inp = document.createElement('input');
+        inp.type = 'hidden'; inp.id = 'stockCritical'; inp.value = '';
+        document.getElementById('stockTable').parentNode.insertBefore(inp, document.getElementById('stockTable'));
+    }());
+
     function filterStockTable() {
-        var searchVal = (document.getElementById('stockSearch').value || '').toLowerCase().trim();
-        var whVal = (document.getElementById('stockWarehouse').value || '').toLowerCase();
-        var stVal = (document.getElementById('stockStatus').value || '');
-        var rows = document.querySelectorAll('.stock-row');
+        var searchVal   = (document.getElementById('stockSearch').value || '').toLowerCase().trim();
+        var whVal       = (document.getElementById('stockWarehouse').value || '').toLowerCase();
+        var stVal       = (document.getElementById('stockStatus').value || '');
+        var locVal      = (document.getElementById('stockLocation').value || '').toLowerCase().trim();
+        var criticalVal = (document.getElementById('stockCritical').value || '');
+        var rows        = document.querySelectorAll('.stock-row');
         var visibleCount = 0;
 
         rows.forEach(function (row) {
-            var code = row.getAttribute('data-code') || '';
-            var name = row.getAttribute('data-name') || '';
-            var wh   = (row.getAttribute('data-warehouse') || '').toLowerCase();
-            var st   = row.getAttribute('data-status') || '';
+            var code     = row.getAttribute('data-code') || '';
+            var name     = row.getAttribute('data-name') || '';
+            var wh       = (row.getAttribute('data-warehouse') || '').toLowerCase();
+            var loc      = (row.getAttribute('data-location') || '').toLowerCase();
+            var st       = row.getAttribute('data-status') || '';
+            var isCrit   = row.getAttribute('data-critical') || 'false';
 
-            var matchSearch = !searchVal || code.includes(searchVal) || name.includes(searchVal);
-            var matchWh     = !whVal || wh === whVal;
-            var matchSt     = !stVal || st === stVal;
+            var matchSearch   = !searchVal   || code.includes(searchVal)  || name.includes(searchVal);
+            var matchWh       = !whVal       || wh === whVal;
+            var matchSt       = !stVal       || st === stVal;
+            var matchLoc      = !locVal      || loc.includes(locVal);
+            var matchCritical = !criticalVal || isCrit === criticalVal;
 
-            if (matchSearch && matchWh && matchSt) {
+            if (matchSearch && matchWh && matchSt && matchLoc && matchCritical) {
                 row.style.display = '';
                 visibleCount++;
             } else {
@@ -621,10 +703,13 @@
     document.getElementById('stockSearch').addEventListener('input', filterStockTable);
     document.getElementById('stockWarehouse').addEventListener('change', filterStockTable);
     document.getElementById('stockStatus').addEventListener('change', filterStockTable);
+    document.getElementById('stockLocation').addEventListener('input', filterStockTable);
     document.getElementById('btnStockReset').addEventListener('click', function () {
         document.getElementById('stockSearch').value = '';
         document.getElementById('stockWarehouse').value = '';
         document.getElementById('stockStatus').value = '';
+        document.getElementById('stockLocation').value = '';
+        document.getElementById('stockCritical').value = '';
         filterStockTable();
     });
 

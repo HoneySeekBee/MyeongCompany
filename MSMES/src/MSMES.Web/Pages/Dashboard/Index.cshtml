@@ -6,9 +6,11 @@
     .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
     .kpi-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
     .kpi-card .kpi-label { font-size: 0.82rem; color: #888; margin-bottom: 4px; }
-    .kpi-card .kpi-value { font-size: 1.9rem; font-weight: 700; color: #2c3e50; }
+    .kpi-card .kpi-value { font-size: 1.9rem; font-weight: 700; color: #2c3e50; display: flex; align-items: center; gap: 8px; }
     .kpi-card .kpi-sub   { font-size: 0.78rem; color: #aaa; margin-top: 2px; }
-    .charts-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 28px; }
+    .kpi-trend-up   { color: #27ae60; font-size: 1.1rem; }
+    .kpi-trend-down { color: #e74c3c; font-size: 1.1rem; }
+    .charts-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 28px; }
     .chart-card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
     .chart-card h3 { margin: 0 0 14px; font-size: 1rem; color: #555; }
     .section-title { font-size: 1rem; font-weight: 600; color: #2c3e50; margin-bottom: 12px; }
@@ -23,7 +25,12 @@
     #error-msg { color: #e74c3c; background: #fdf3f3; border: 1px solid #f5c6cb; border-radius: 4px; padding: 12px 16px; display: none; margin-bottom: 16px; }
 </style>
 
-<h1>MES 대시보드</h1>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+    <h1 style="margin:0;">MES 대시보드</h1>
+    <span id="refresh-spinner" class="spinner-border spinner-border-sm text-primary ms-2" style="display:none;"></span>
+</div>
+<div id="last-updated" class="text-muted small mb-3" style="text-align:right;"></div>
+
 <div id="error-msg"></div>
 <div id="loading">데이터를 불러오는 중...</div>
 <div id="dashboard-content" style="display:none;">
@@ -32,8 +39,15 @@
     <div class="kpi-grid">
         <div class="kpi-card">
             <div class="kpi-label">금일 생산량</div>
-            <div class="kpi-value" id="kpi-produced">-</div>
+            <div class="kpi-value">
+                <span id="kpi-produced">-</span>
+                <span id="kpi-produced-trend"></span>
+            </div>
             <div class="kpi-sub">목표: <span id="kpi-target">-</span></div>
+            <div class="progress mt-2" style="height:4px;">
+                <div class="progress-bar bg-primary" id="kpi-progress-bar" style="width:0%"></div>
+            </div>
+            <div id="kpi-achieve-pct" style="font-size:.75rem;color:#aaa;margin-top:3px;"></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">금일 불량수량</div>
@@ -62,7 +76,7 @@
         </div>
     </div>
 
-    <!-- 차트 영역 -->
+    <!-- 차트 영역 (3컬럼: 생산 추이 / 설비 도넛 / 달성률 게이지) -->
     <div class="charts-row">
         <div class="chart-card">
             <h3>일별 생산 추이 (최근 7일)</h3>
@@ -71,6 +85,11 @@
         <div class="chart-card">
             <h3>설비 상태 분포</h3>
             <canvas id="chart-equipment" height="160"></canvas>
+        </div>
+        <div class="chart-card" style="display:flex;flex-direction:column;align-items:center;">
+            <h3 style="width:100%;">금일 생산 달성률</h3>
+            <canvas id="chart-gauge" height="160"></canvas>
+            <div id="gauge-pct" style="text-align:center;font-size:1.8rem;font-weight:700;margin-top:-30px;"></div>
         </div>
     </div>
 
@@ -90,94 +109,191 @@
         </tbody>
     </table>
 
+    <!-- 최근 알람 -->
+    <div class="section-title mt-4">최근 알람</div>
+    <div id="recent-alerts"><!-- JS로 로드 --></div>
+
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
-(async function () {
-    const loading = document.getElementById('loading');
-    const content = document.getElementById('dashboard-content');
-    const errMsg  = document.getElementById('error-msg');
+(function () {
+    const loading   = document.getElementById('loading');
+    const content   = document.getElementById('dashboard-content');
+    const errMsg    = document.getElementById('error-msg');
+    const spinner   = document.getElementById('refresh-spinner');
+    const lastUpd   = document.getElementById('last-updated');
 
-    let data;
-    try {
-        const resp = await fetch('/api/dashboard');
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        data = await resp.json();
-    } catch (e) {
-        loading.style.display = 'none';
-        errMsg.style.display  = 'block';
-        errMsg.textContent    = '대시보드 데이터를 불러오지 못했습니다: ' + e.message;
-        return;
-    }
-
-    const kpi = data.kpi;
-
-    // KPI 채우기
-    document.getElementById('kpi-produced').textContent     = fmt(kpi.todayProduced);
-    document.getElementById('kpi-target').textContent       = fmt(kpi.todayTarget);
-    document.getElementById('kpi-defect').textContent       = fmt(kpi.todayDefect);
-    const defRate = kpi.todayProduced > 0
-        ? (kpi.todayDefect / kpi.todayProduced * 100).toFixed(1) + '%'
-        : '0%';
-    document.getElementById('kpi-defect-rate').textContent  = defRate;
-    document.getElementById('kpi-so-count').textContent     = kpi.openSalesOrderCount + ' 건';
-    document.getElementById('kpi-so-amount').textContent    = fmtMoney(kpi.openSalesOrderAmount);
-    document.getElementById('kpi-wo').textContent           =
-        kpi.workOrderPlanned + ' / ' + kpi.workOrderInProgress + ' / ' + kpi.workOrderCompleted;
-    document.getElementById('kpi-eq-running').textContent   = kpi.equipmentRunning + ' 대';
-    document.getElementById('kpi-eq-maint').textContent     = kpi.equipmentMaintenance;
-    document.getElementById('kpi-eq-break').textContent     = kpi.equipmentBreakdown;
-    document.getElementById('kpi-week-defect').textContent  =
-        (kpi.recent7DaysDefectRate ?? 0).toFixed(1) + '%';
-
-    // 생산 라인차트
-    const chart  = data.productionChart;
-    const labels = chart.dates.map(d => d.substring(0, 10));
-    new Chart(document.getElementById('chart-production'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                { label: '생산량', data: chart.produced, borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,.15)', tension: 0.3, fill: true },
-                { label: '불량량', data: chart.defect,   borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,.10)',   tension: 0.3, fill: true }
-            ]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-
-    // 설비 도넛차트
-    new Chart(document.getElementById('chart-equipment'), {
-        type: 'doughnut',
-        data: {
-            labels: ['가동중', '정지', '점검중', '고장'],
-            datasets: [{
-                data: [kpi.equipmentRunning, kpi.equipmentStopped, kpi.equipmentMaintenance, kpi.equipmentBreakdown],
-                backgroundColor: ['#27ae60', '#95a5a6', '#f39c12', '#e74c3c']
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-
-    // 최근 작업지시
-    const tbody  = document.getElementById('recent-wo-body');
-    const statusNames = { '0':'계획','1':'릴리즈','2':'진행중','3':'완료','4':'마감' };
-    for (const wo of data.recentWorkOrders) {
-        const tr = document.createElement('tr');
-        const statusClass = 'badge-' + wo.status;
-        tr.innerHTML = `
-            <td>${wo.workOrderNo}</td>
-            <td>${wo.itemCode}</td>
-            <td>${fmt(wo.quantity)}</td>
-            <td><span class="badge ${statusClass}">${statusNames[wo.status] ?? wo.status}</span></td>
-            <td>${new Date(wo.createdAt).toLocaleString('ko-KR')}</td>`;
-        tbody.appendChild(tr);
-    }
-
-    loading.style.display  = 'none';
-    content.style.display  = 'block';
+    // Chart instances — kept so they can be destroyed on refresh
+    let chartProduction = null;
+    let chartEquipment  = null;
+    let chartGauge      = null;
 
     function fmt(n)      { return Number(n).toLocaleString('ko-KR'); }
     function fmtMoney(n) { return '₩' + Number(n).toLocaleString('ko-KR'); }
+
+    async function loadDashboard() {
+        spinner.style.display = 'inline-block';
+        try {
+            const resp = await fetch('/api/dashboard');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            renderDashboard(data);
+            errMsg.style.display = 'none';
+        } catch (e) {
+            errMsg.style.display = 'block';
+            errMsg.textContent   = '대시보드 데이터를 불러오지 못했습니다: ' + e.message;
+        } finally {
+            spinner.style.display = 'none';
+        }
+    }
+
+    function renderDashboard(data) {
+        const kpi = data.kpi;
+
+        // --- KPI 채우기 ---
+        document.getElementById('kpi-produced').textContent = fmt(kpi.todayProduced);
+        document.getElementById('kpi-target').textContent   = fmt(kpi.todayTarget);
+
+        // 목표 대비 추세 화살표
+        const trendEl = document.getElementById('kpi-produced-trend');
+        if (kpi.todayProduced > kpi.todayTarget * 0.8) {
+            trendEl.textContent  = '▲';
+            trendEl.className    = 'kpi-trend-up';
+        } else {
+            trendEl.textContent  = '▼';
+            trendEl.className    = 'kpi-trend-down';
+        }
+
+        // 진행 바 & 달성률 텍스트
+        const target      = kpi.todayTarget || 1;
+        const achievePct  = Math.min(100, Math.round(kpi.todayProduced / target * 100));
+        document.getElementById('kpi-progress-bar').style.width = achievePct + '%';
+        document.getElementById('kpi-achieve-pct').textContent  = '목표 달성률: ' + achievePct + '%';
+
+        document.getElementById('kpi-defect').textContent     = fmt(kpi.todayDefect);
+        const defRate = kpi.todayProduced > 0
+            ? (kpi.todayDefect / kpi.todayProduced * 100).toFixed(1) + '%'
+            : '0%';
+        document.getElementById('kpi-defect-rate').textContent = defRate;
+        document.getElementById('kpi-so-count').textContent    = kpi.openSalesOrderCount + ' 건';
+        document.getElementById('kpi-so-amount').textContent   = fmtMoney(kpi.openSalesOrderAmount);
+        document.getElementById('kpi-wo').textContent          =
+            kpi.workOrderPlanned + ' / ' + kpi.workOrderInProgress + ' / ' + kpi.workOrderCompleted;
+        document.getElementById('kpi-eq-running').textContent  = kpi.equipmentRunning + ' 대';
+        document.getElementById('kpi-eq-maint').textContent    = kpi.equipmentMaintenance;
+        document.getElementById('kpi-eq-break').textContent    = kpi.equipmentBreakdown;
+        document.getElementById('kpi-week-defect').textContent =
+            (kpi.recent7DaysDefectRate ?? 0).toFixed(1) + '%';
+
+        // --- 생산 라인차트 ---
+        const chart  = data.productionChart;
+        const labels = chart.dates.map(d => d.substring(0, 10));
+
+        if (chartProduction) chartProduction.destroy();
+        chartProduction = new Chart(document.getElementById('chart-production'), {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [
+                    { label: '생산량', data: chart.produced, borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,.15)', tension: 0.3, fill: true },
+                    { label: '불량량', data: chart.defect,   borderColor: '#e74c3c', backgroundColor: 'rgba(231,76,60,.10)',   tension: 0.3, fill: true }
+                ]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // --- 설비 도넛차트 ---
+        if (chartEquipment) chartEquipment.destroy();
+        chartEquipment = new Chart(document.getElementById('chart-equipment'), {
+            type: 'doughnut',
+            data: {
+                labels: ['가동중', '정지', '점검중', '고장'],
+                datasets: [{
+                    data: [kpi.equipmentRunning, kpi.equipmentStopped, kpi.equipmentMaintenance, kpi.equipmentBreakdown],
+                    backgroundColor: ['#27ae60', '#95a5a6', '#f39c12', '#e74c3c']
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        });
+
+        // --- 달성률 게이지 (반원 도넛) ---
+        const pct = Math.min(100, Math.round(kpi.todayProduced / (kpi.todayTarget || 1) * 100));
+        const gaugeColor = pct >= 80 ? '#27ae60' : pct >= 50 ? '#f39c12' : '#e74c3c';
+        document.getElementById('gauge-pct').textContent = pct + '%';
+        document.getElementById('gauge-pct').style.color = gaugeColor;
+
+        if (chartGauge) chartGauge.destroy();
+        chartGauge = new Chart(document.getElementById('chart-gauge'), {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [pct, 100 - pct],
+                    backgroundColor: [gaugeColor, '#f0f2f5'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                circumference: 180,
+                rotation: -90,
+                cutout: '75%',
+                plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            }
+        });
+
+        // --- 최근 작업지시 ---
+        const tbody      = document.getElementById('recent-wo-body');
+        tbody.innerHTML  = '';
+        const statusNames = { '0': '계획', '1': '릴리즈', '2': '진행중', '3': '완료', '4': '마감' };
+        for (const wo of data.recentWorkOrders) {
+            const tr = document.createElement('tr');
+            const statusClass = 'badge-' + wo.status;
+            tr.innerHTML = `
+                <td>${wo.workOrderNo}</td>
+                <td>${wo.itemCode}</td>
+                <td>${fmt(wo.quantity)}</td>
+                <td><span class="badge ${statusClass}">${statusNames[wo.status] ?? wo.status}</span></td>
+                <td>${new Date(wo.createdAt).toLocaleString('ko-KR')}</td>`;
+            tbody.appendChild(tr);
+        }
+
+        // 최종 갱신 시각
+        lastUpd.textContent = '최종 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+    }
+
+    async function loadAlerts() {
+        try {
+            const r      = await fetch('/api/dashboard/alerts');
+            if (!r.ok) return;
+            const alerts = await r.json();
+            const div    = document.getElementById('recent-alerts');
+            if (!alerts.length) {
+                div.innerHTML = '<p class="text-muted small">알람 없음</p>';
+                return;
+            }
+            div.innerHTML = alerts.map(a => `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:6px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+                    <i class="bi ${a.alertTypeIcon} text-${a.severityCss} fs-5"></i>
+                    <div style="flex:1;font-size:.85rem;">${a.title}</div>
+                    <span class="badge bg-${a.severityCss}">${a.severity === 3 ? '위험' : a.severity === 2 ? '경고' : '정보'}</span>
+                    <a href="/Alerts" style="font-size:.75rem;color:#1a73e8;">보기</a>
+                </div>`).join('');
+        } catch (_) { /* 알람 로드 실패는 무시 */ }
+    }
+
+    async function loadAll() {
+        await Promise.all([loadDashboard(), loadAlerts()]);
+    }
+
+    // 최초 로드
+    loadAll().then(() => {
+        loading.style.display  = 'none';
+        content.style.display  = 'block';
+
+        // 30초마다 자동 갱신
+        setTimeout(function autoRefresh() {
+            loadAll().then(() => setTimeout(autoRefresh, 30000));
+        }, 30000);
+    });
 })();
 </script>

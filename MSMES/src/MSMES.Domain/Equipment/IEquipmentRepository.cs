@@ -18,4 +18,9 @@ public interface IEquipmentRepository
     Task UpdateStatusAsync(string equipmentCode, EquipmentStatus status, CancellationToken ct = default);
 
     Task<IReadOnlyList<OeeRecord>> GetOeeRecordsAsync(DateTime from, DateTime to, CancellationToken ct = default);
+
+    Task<IReadOnlyList<PmSchedule>> GetPmSchedulesAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<PmRecord>>   GetPmRecordsAsync(int? equipmentId, CancellationToken ct = default);
+    Task<int>                       CreatePmRecordAsync(PmRecord record, CancellationToken ct = default);
+    Task                            UpdatePmScheduleNextDateAsync(int scheduleId, DateTime nextDate, CancellationToken ct = default);
 }

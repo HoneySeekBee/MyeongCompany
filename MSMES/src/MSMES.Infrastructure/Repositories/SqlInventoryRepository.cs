@@ -52,8 +52,10 @@ public sealed class SqlInventoryRepository : IInventoryRepository
     {
         using var conn = _factory.Create();
         const string sql = @"INSERT INTO dbo.Inventories
-            (ItemCode, ItemName, WarehouseCode, CurrentStock, SafetyStock, Unit, CreatedAt, CreatedBy)
-            VALUES (@ItemCode, @ItemName, @WarehouseCode, @CurrentStock, @SafetyStock, @Unit, @CreatedAt, @CreatedBy)";
+            (ItemCode, ItemName, WarehouseCode, CurrentStock, SafetyStock, MaxStock,
+             WarehouseLocation, Unit, CreatedAt, CreatedBy)
+            VALUES (@ItemCode, @ItemName, @WarehouseCode, @CurrentStock, @SafetyStock, @MaxStock,
+                    @WarehouseLocation, @Unit, @CreatedAt, @CreatedBy)";
         await conn.ExecuteAsync(new CommandDefinition(sql, inventory, cancellationToken: ct));
     }
 
@@ -61,7 +63,11 @@ public sealed class SqlInventoryRepository : IInventoryRepository
     {
         using var conn = _factory.Create();
         const string sql = @"UPDATE dbo.Inventories
-            SET CurrentStock = @CurrentStock, UpdatedAt = SYSUTCDATETIME()
+            SET CurrentStock      = @CurrentStock,
+                SafetyStock       = @SafetyStock,
+                MaxStock          = @MaxStock,
+                WarehouseLocation = @WarehouseLocation,
+                UpdatedAt         = SYSUTCDATETIME()
             WHERE ItemCode = @ItemCode AND WarehouseCode = @WarehouseCode";
         await conn.ExecuteAsync(new CommandDefinition(sql, inventory, cancellationToken: ct));
     }

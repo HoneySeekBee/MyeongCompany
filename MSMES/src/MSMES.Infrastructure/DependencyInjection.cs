@@ -12,6 +12,7 @@ using MSMES.Domain.Process;
 using MSMES.Domain.ProductionPlan;
 using MSMES.Domain.PurchaseOrder;
 using MSMES.Domain.Quality;
+using MSMES.Domain.Receiving;
 using MSMES.Domain.SalesOrder;
 using MSMES.Domain.Shipment;
 using MSMES.Domain.WorkOrder;
@@ -43,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IBomRepository, SqlBomRepository>();
         services.AddScoped<IProductionPlanRepository, SqlProductionPlanRepository>();
         services.AddScoped<IAlertRepository, SqlAlertRepository>();
+        services.AddScoped<IGoodsReceiptRepository, SqlGoodsReceiptRepository>();
 
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
         // Application.Common 인터페이스로 등록 (Application 레이어에서 주입 가능)

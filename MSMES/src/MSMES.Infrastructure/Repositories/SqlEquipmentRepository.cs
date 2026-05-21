@@ -141,4 +141,41 @@ public sealed class SqlEquipmentRepository : IEquipmentRepository
             new { from = from.Date, to = to.Date }, cancellationToken: ct));
         return rows.ToList();
     }
+
+    public async Task<IReadOnlyList<PmSchedule>> GetPmSchedulesAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<PmSchedule>(new CommandDefinition(
+            "SELECT * FROM PmSchedules WHERE IsActive = 1 ORDER BY NextPmDate",
+            cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<PmRecord>> GetPmRecordsAsync(int? equipmentId, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var sql = equipmentId.HasValue
+            ? "SELECT TOP 50 * FROM PmRecords WHERE EquipmentId = @equipmentId ORDER BY PmDate DESC"
+            : "SELECT TOP 50 * FROM PmRecords ORDER BY PmDate DESC";
+        var rows = await conn.QueryAsync<PmRecord>(new CommandDefinition(sql, new { equipmentId }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task<int> CreatePmRecordAsync(PmRecord record, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        return await conn.ExecuteScalarAsync<int>(new CommandDefinition("""
+            INSERT INTO PmRecords (PmScheduleId,EquipmentId,EquipmentName,PmDate,Technician,Result,FindingsNote,WorkTimeMinutes,CreatedAt)
+            VALUES (@PmScheduleId,@EquipmentId,@EquipmentName,@PmDate,@Technician,@Result,@FindingsNote,@WorkTimeMinutes,@CreatedAt);
+            SELECT CAST(SCOPE_IDENTITY() AS INT);
+            """, record, cancellationToken: ct));
+    }
+
+    public async Task UpdatePmScheduleNextDateAsync(int scheduleId, DateTime nextDate, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        await conn.ExecuteAsync(new CommandDefinition(
+            "UPDATE PmSchedules SET LastPmDate = CAST(GETDATE() AS DATE), NextPmDate = @nextDate WHERE Id = @scheduleId",
+            new { scheduleId, nextDate = nextDate.Date }, cancellationToken: ct));
+    }
 }

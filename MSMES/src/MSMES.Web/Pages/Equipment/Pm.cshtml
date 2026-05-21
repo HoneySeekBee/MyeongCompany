@@ -1,0 +1,116 @@
+@page
+@model MSMES.Web.Pages.Equipment.PmModel
+@{ ViewData["Title"] = "예방정비 (PM)"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">예방정비 스케줄</h1>
+</div>
+
+<!-- KPI -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-danger border-start border-4">
+            <div class="text-danger small fw-semibold">기한 초과</div>
+            <div class="h2 fw-bold text-danger mb-0">@Model.OverdueCount</div>
+            <div class="text-muted small">즉시 처리 필요</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-warning border-start border-4">
+            <div class="text-warning small fw-semibold">3일 이내</div>
+            <div class="h2 fw-bold text-warning mb-0">@Model.DueSoonCount</div>
+            <div class="text-muted small">곧 점검 예정</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-success border-start border-4">
+            <div class="text-success small fw-semibold">정상</div>
+            <div class="h2 fw-bold text-success mb-0">@Model.HealthyCount</div>
+            <div class="text-muted small">일정 준수 중</div>
+        </div>
+    </div>
+</div>
+
+<!-- PM Schedule table -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 pb-2">
+        <h6 class="mb-0">PM 점검 일정</h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+                <tr><th>설비명</th><th>점검유형</th><th>주기</th><th>마지막 점검</th><th>다음 점검일</th><th>D-Day</th><th>담당자</th><th>상태</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model.Schedules.OrderBy(s => s.DaysUntilDue))
+            {
+                var rowClass = s.IsOverdue ? "table-danger" : s.IsDueSoon ? "table-warning" : "";
+                <tr class="@rowClass" data-bs-toggle="collapse" data-bs-target="#pm-@s.Id" style="cursor:pointer;">
+                    <td class="fw-medium">@s.EquipmentName</td>
+                    <td><span class="badge bg-secondary">@s.PmType</span></td>
+                    <td>@(s.IntervalDays)일</td>
+                    <td class="text-muted small">@(s.LastPmDate?.ToString("MM/dd") ?? "-")</td>
+                    <td class="fw-semibold">@s.NextPmDate.ToString("yyyy/MM/dd")</td>
+                    <td>
+                        <span class="badge bg-@s.UrgencyCss">
+                            @(s.IsOverdue ? $"D+{Math.Abs(s.DaysUntilDue)}" : $"D-{s.DaysUntilDue}")
+                        </span>
+                    </td>
+                    <td>@(s.AssignedTo ?? "-")</td>
+                    <td>
+                        <span class="badge bg-@s.UrgencyCss">
+                            @(s.IsOverdue ? "기한초과" : s.IsDueSoon ? "임박" : "정상")
+                        </span>
+                    </td>
+                </tr>
+                <tr class="collapse" id="pm-@s.Id">
+                    <td colspan="8" class="bg-light p-3">
+                        <strong class="small text-muted">점검 항목:</strong>
+                        <div class="mt-1">
+                        @foreach (var item in s.CheckItemList)
+                        {
+                            <span class="badge bg-light text-dark border me-1 mb-1"><i class="bi bi-check2 text-success me-1"></i>@item</span>
+                        }
+                        </div>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Schedules.Any())
+            {
+                <tr><td colspan="8" class="text-center text-muted py-4">PM 일정이 없습니다.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- PM History -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 pb-2">
+        <h6 class="mb-0">정비 이력 (최근 50건)</h6>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-dark">
+                <tr><th>점검일</th><th>설비명</th><th>기술자</th><th>작업시간</th><th>결과</th><th>특이사항</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var r in Model.Records)
+            {
+                <tr>
+                    <td>@r.PmDate.ToString("MM/dd")</td>
+                    <td>@r.EquipmentName</td>
+                    <td>@r.Technician</td>
+                    <td>@(r.WorkTimeMinutes)분</td>
+                    <td><span class="badge bg-@r.ResultCss">@r.ResultName</span></td>
+                    <td class="small text-muted">@r.FindingsNote</td>
+                </tr>
+            }
+            @if (!Model.Records.Any())
+            {
+                <tr><td colspan="6" class="text-center text-muted py-4">이력이 없습니다.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
