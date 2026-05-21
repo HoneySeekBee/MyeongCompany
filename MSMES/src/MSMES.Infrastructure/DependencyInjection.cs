@@ -36,6 +36,7 @@ public static class DependencyInjection
         services.AddScoped<IEquipmentRepository, SqlEquipmentRepository>();
         services.AddScoped<IProcessRepository, SqlProcessRepository>();
         services.AddScoped<IDashboardRepository, SqlDashboardRepository>();
+        services.AddScoped<IAuditLogRepository, SqlAuditLogRepository>();
 
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
         // Application.Common 인터페이스로 등록 (Application 레이어에서 주입 가능)

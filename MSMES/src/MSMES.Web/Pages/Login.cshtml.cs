@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using MSMES.Application.Common;
 using MSMES.Domain.Common;
 
 namespace MSMES.Web.Pages;
@@ -11,11 +12,13 @@ public class LoginModel : PageModel
 {
     private readonly IUserRepository _users;
     private readonly MSMES.Application.Common.IPasswordHasher _hasher;
+    private readonly AuditLogService _auditLog;
 
-    public LoginModel(IUserRepository users, MSMES.Application.Common.IPasswordHasher hasher)
+    public LoginModel(IUserRepository users, MSMES.Application.Common.IPasswordHasher hasher, AuditLogService auditLog)
     {
         _users = users;
         _hasher = hasher;
+        _auditLog = auditLog;
     }
 
     [BindProperty]
@@ -75,6 +78,11 @@ public class LoginModel : PageModel
             CookieAuthenticationDefaults.AuthenticationScheme,
             principal,
             authProperties);
+
+        await _auditLog.LogAsync(
+            user.UserId, user.Name, "LOGIN", "Auth",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString(),
+            ct: ct);
 
         // 5. 대시보드로 리다이렉트
         return RedirectToPage("/Index");

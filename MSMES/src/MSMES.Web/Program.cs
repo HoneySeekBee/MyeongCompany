@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using MSMES.Application.Auth;
+using MSMES.Application.Common;
 using MSMES.Application.Dashboard;
 using MSMES.Application.Equipment;
 using MSMES.Application.Inventory;
@@ -44,6 +45,7 @@ builder.Services.AddScoped<CreateMaintenanceHandler>();
 builder.Services.AddScoped<CreateProductionResultHandler>();
 builder.Services.AddScoped<GetProductionResultHandler>();
 builder.Services.AddScoped<DashboardHandler>();
+builder.Services.AddScoped<AuditLogService>();
 
 // JWT + Cookie 이중 인증 체계
 var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>() ?? new JwtOptions();

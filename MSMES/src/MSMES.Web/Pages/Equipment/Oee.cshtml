@@ -1,0 +1,168 @@
+@page
+@model MSMES.Web.Pages.Equipment.OeeModel
+@{ ViewData["Title"] = "OEE 설비종합효율"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">OEE 설비종합효율</h1>
+    <span class="text-muted small">최근 7일</span>
+</div>
+
+<!-- OEE 요약 KPI -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <div class="text-muted small mb-1">종합 OEE</div>
+                <div class="display-5 fw-bold @(Model.AvgOEE >= 85 ? "text-success" : Model.AvgOEE >= 65 ? "text-warning" : "text-danger")">
+                    @Model.AvgOEE%
+                </div>
+                <div class="text-muted small mt-1">목표: 85%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <div class="text-muted small mb-1">가동률 (Availability)</div>
+                <div class="display-5 fw-bold text-primary">@Model.AvgAvailability%</div>
+                <div class="text-muted small mt-1">실가동 / 계획가동</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <div class="text-muted small mb-1">성능률 (Performance)</div>
+                <div class="display-5 fw-bold text-info">@Model.AvgPerformance%</div>
+                <div class="text-muted small mt-1">실생산 / 이상생산</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-0 shadow-sm">
+            <div class="card-body py-4">
+                <div class="text-muted small mb-1">품질률 (Quality Rate)</div>
+                <div class="display-5 fw-bold text-success">@Model.AvgQualityRate%</div>
+                <div class="text-muted small mt-1">양품 / 총생산</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- OEE 차트 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+                <h6 class="mb-0">설비별 OEE 추이</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="oeeChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-4 pb-0">
+                <h6 class="mb-0">OEE 구성요소</h6>
+            </div>
+            <div class="card-body">
+                <canvas id="oeePieChart" height="150"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 상세 테이블 -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h6 class="mb-0">일별 OEE 상세</h6>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>날짜</th><th>설비명</th>
+                        <th>계획시간(분)</th><th>실가동(분)</th>
+                        <th>가동률</th><th>성능률</th><th>품질률</th>
+                        <th>OEE</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var r in Model.Records)
+                {
+                    <tr>
+                        <td>@r.RecordDate.ToString("MM/dd")</td>
+                        <td>@r.EquipmentName</td>
+                        <td>@r.PlannedTimeMinutes</td>
+                        <td>@r.ActualTimeMinutes</td>
+                        <td>@r.Availability%</td>
+                        <td>@r.Performance%</td>
+                        <td>@r.QualityRate%</td>
+                        <td>
+                            <span class="badge @(r.OEE >= 85 ? "bg-success" : r.OEE >= 65 ? "bg-warning text-dark" : "bg-danger")">
+                                @r.OEE%
+                            </span>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Records.Any())
+                {
+                    <tr><td colspan="8" class="text-center text-muted py-4">OEE 데이터가 없습니다.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const records = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(Model.Records.Select(r => new {
+    date = r.RecordDate.ToString("MM/dd"),
+    name = r.EquipmentName,
+    oee  = r.OEE,
+    avail = r.Availability,
+    perf  = r.Performance,
+    qual  = r.QualityRate
+})));
+
+// Group by equipment
+const equipment = [...new Set(records.map(r => r.name))];
+const dates = [...new Set(records.map(r => r.date))];
+const colors = ['#3498db','#27ae60','#e74c3c','#f39c12','#9b59b6'];
+
+new Chart(document.getElementById('oeeChart'), {
+    type: 'line',
+    data: {
+        labels: dates,
+        datasets: equipment.map((eq, i) => ({
+            label: eq,
+            data: dates.map(d => records.find(r => r.name === eq && r.date === d)?.oee ?? null),
+            borderColor: colors[i % colors.length],
+            tension: 0.3,
+            fill: false
+        }))
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+});
+
+const avg = v => Math.round(records.reduce((s,r) => s + r[v], 0) / records.length * 10) / 10;
+new Chart(document.getElementById('oeePieChart'), {
+    type: 'radar',
+    data: {
+        labels: ['가동률', '성능률', '품질률'],
+        datasets: [{
+            label: '평균',
+            data: [avg('avail'), avg('perf'), avg('qual')],
+            backgroundColor: 'rgba(52,152,219,0.2)',
+            borderColor: '#3498db',
+            pointBackgroundColor: '#3498db'
+        }]
+    },
+    options: { responsive: true, scales: { r: { min: 0, max: 100 } } }
+});
+</script>
+}

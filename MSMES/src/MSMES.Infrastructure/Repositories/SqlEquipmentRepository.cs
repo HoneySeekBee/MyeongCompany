@@ -132,4 +132,13 @@ public sealed class SqlEquipmentRepository : IEquipmentRepository
             WHERE EquipmentCode = @code";
         await conn.ExecuteAsync(new CommandDefinition(sql, new { status = (int)status, code = equipmentCode }, cancellationToken: ct));
     }
+
+    public async Task<IReadOnlyList<OeeRecord>> GetOeeRecordsAsync(DateTime from, DateTime to, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<OeeRecord>(new CommandDefinition(
+            "SELECT * FROM OeeRecords WHERE RecordDate >= @from AND RecordDate < @to ORDER BY RecordDate, EquipmentId",
+            new { from = from.Date, to = to.Date }, cancellationToken: ct));
+        return rows.ToList();
+    }
 }

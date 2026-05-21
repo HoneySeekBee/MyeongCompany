@@ -171,16 +171,27 @@
                         <i class="bi bi-wrench-adjustable"></i>
                         <span class="ms-sidebar__link-text">설비관리</span>
                     </a>
+                    <a href="/Equipment/Oee" class="ms-sidebar__link" aria-label="OEE 효율">
+                        <i class="bi bi-speedometer2"></i>
+                        <span class="ms-sidebar__link-text">OEE 효율</span>
+                    </a>
                 }
             }
 
-            @if (isAdmin)
+            @if (isAdmin || isManager)
             {
                 <hr class="ms-sidebar__divider" />
                 <div class="ms-sidebar__group-label">시스템 관리</div>
-                <a href="/Admin/Users" class="ms-sidebar__link" aria-label="사용자관리">
-                    <i class="bi bi-people"></i>
-                    <span class="ms-sidebar__link-text">사용자관리</span>
+                @if (isAdmin)
+                {
+                    <a href="/Admin/Users" class="ms-sidebar__link" aria-label="사용자관리">
+                        <i class="bi bi-people"></i>
+                        <span class="ms-sidebar__link-text">사용자관리</span>
+                    </a>
+                }
+                <a href="/Admin/AuditLogs" class="ms-sidebar__link" aria-label="감사 로그">
+                    <i class="bi bi-journal-text"></i>
+                    <span class="ms-sidebar__link-text">감사 로그</span>
                 </a>
             }
 
@@ -220,27 +231,43 @@
                     </span>
                 </button>
 
-                <!-- 사용자 정보 + Role 뱃지 -->
-                <div class="ms-header__user">
-                    <div class="ms-header__user-avatar" aria-hidden="true">@userInitial</div>
-                    <span class="d-none d-md-inline">@userName</span>
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        @if (roleBadgeClass == "ms-purple")
+                <!-- 사용자 정보 + Role 뱃지 (드롭다운) -->
+                <div class="dropdown">
+                    <button class="ms-header__user btn btn-link p-0 border-0 text-reset text-decoration-none"
+                            type="button" id="userDropdown" data-bs-toggle="dropdown"
+                            aria-expanded="false" aria-label="사용자 메뉴">
+                        <div class="ms-header__user-avatar" aria-hidden="true">@userInitial</div>
+                        <span class="d-none d-md-inline">@userName</span>
+                        @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <span class="badge d-none d-md-inline" style="background-color:#6f42c1;font-size:11px;">@userRole</span>
+                            @if (roleBadgeClass == "ms-purple")
+                            {
+                                <span class="badge d-none d-md-inline" style="background-color:#6f42c1;font-size:11px;">@userRole</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-@roleBadgeClass d-none d-md-inline" style="font-size:11px;">@userRole</span>
+                            }
                         }
-                        else
-                        {
-                            <span class="badge bg-@roleBadgeClass d-none d-md-inline" style="font-size:11px;">@userRole</span>
-                        }
-                    }
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li>
+                            <a class="dropdown-item" href="/Account/ChangePassword">
+                                <i class="bi bi-lock me-1"></i>비밀번호 변경
+                            </a>
+                        </li>
+                        <li><hr class="dropdown-divider" /></li>
+                        <li>
+                            <a class="dropdown-item" href="/Logout">
+                                <i class="bi bi-box-arrow-right me-1"></i>로그아웃
+                            </a>
+                        </li>
+                    </ul>
                 </div>
 
-                <!-- 로그아웃 -->
-                <a href="/Logout" class="btn btn-sm btn-outline-secondary" aria-label="로그아웃">
+                <!-- 로그아웃 (소형 화면용 빠른 접근) -->
+                <a href="/Logout" class="btn btn-sm btn-outline-secondary d-md-none" aria-label="로그아웃">
                     <i class="bi bi-box-arrow-right"></i>
-                    <span class="d-none d-sm-inline ms-1">로그아웃</span>
                 </a>
             </div>
         </header>

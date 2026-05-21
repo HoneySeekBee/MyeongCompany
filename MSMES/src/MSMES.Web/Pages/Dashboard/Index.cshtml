@@ -101,9 +101,7 @@
 
     let data;
     try {
-        const resp = await fetch('/api/dashboard', {
-            headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('token') ?? '') }
-        });
+        const resp = await fetch('/api/dashboard');
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         data = await resp.json();
     } catch (e) {

@@ -16,4 +16,6 @@ public interface IEquipmentRepository
 
     Task<IReadOnlyList<Equipment>> GetMaintenanceDueAsync(CancellationToken ct = default);
     Task UpdateStatusAsync(string equipmentCode, EquipmentStatus status, CancellationToken ct = default);
+
+    Task<IReadOnlyList<OeeRecord>> GetOeeRecordsAsync(DateTime from, DateTime to, CancellationToken ct = default);
 }

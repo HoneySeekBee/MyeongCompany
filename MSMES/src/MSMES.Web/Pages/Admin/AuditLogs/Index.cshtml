@@ -1,0 +1,50 @@
+@page
+@model MSMES.Web.Pages.Admin.AuditLogs.IndexModel
+@{ ViewData["Title"] = "감사 로그"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">감사 로그</h1>
+    <span class="badge bg-secondary">최근 100건</span>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>일시</th>
+                        <th>사용자</th>
+                        <th>액션</th>
+                        <th>대상</th>
+                        <th>ID</th>
+                        <th>설명</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var log in Model.Logs)
+                {
+                    <tr>
+                        <td class="text-nowrap small">@log.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm:ss")</td>
+                        <td>@log.UserName</td>
+                        <td>
+                            <span class="badge @(log.Action=="LOGIN"?"bg-success":log.Action=="DELETE"?"bg-danger":log.Action=="CREATE"?"bg-primary":"bg-secondary")">
+                                @log.Action
+                            </span>
+                        </td>
+                        <td>@log.EntityType</td>
+                        <td class="small text-muted">@log.EntityId</td>
+                        <td class="small">@log.Description</td>
+                        <td class="small text-muted">@log.IpAddress</td>
+                    </tr>
+                }
+                @if (!Model.Logs.Any())
+                {
+                    <tr><td colspan="7" class="text-center text-muted py-4">감사 로그가 없습니다.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
