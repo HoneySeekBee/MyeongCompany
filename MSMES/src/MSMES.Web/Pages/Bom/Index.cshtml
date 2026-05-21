@@ -1,0 +1,190 @@
+@page
+@model MSMES.Web.Pages.Bom.IndexModel
+@{ ViewData["Title"] = "BOM 자재명세서"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">
+        <i class="bi bi-diagram-3 me-2 text-primary"></i>BOM 자재명세서
+    </h1>
+    <a href="/api/export/bom" class="btn btn-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Excel
+    </a>
+</div>
+
+<!-- KPI 카드 -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary bg-opacity-10"
+                     style="width:48px;height:48px;flex-shrink:0;">
+                    <i class="bi bi-diagram-3 text-primary fs-5"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">전체 BOM 수</div>
+                    <div class="fw-bold fs-4 lh-1">@Model.Boms.Count</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center bg-success bg-opacity-10"
+                     style="width:48px;height:48px;flex-shrink:0;">
+                    <i class="bi bi-check-circle text-success fs-5"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">활성 BOM</div>
+                    <div class="fw-bold fs-4 lh-1">@Model.ActiveCount</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center bg-warning bg-opacity-10"
+                     style="width:48px;height:48px;flex-shrink:0;">
+                    <i class="bi bi-list-ul text-warning fs-5"></i>
+                </div>
+                <div>
+                    <div class="text-muted small">총 자재 항목 수</div>
+                    <div class="fw-bold fs-4 lh-1">@Model.TotalItems</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- BOM 테이블 -->
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex align-items-center py-3">
+        <i class="bi bi-table me-2 text-muted"></i>
+        <span class="fw-semibold">BOM 목록</span>
+        <span class="badge bg-secondary ms-2">@Model.Boms.Count</span>
+    </div>
+    <div class="card-body p-0">
+        @if (!Model.Boms.Any())
+        {
+            <div class="text-center text-muted py-5">
+                <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                등록된 BOM이 없습니다.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th class="ps-3" style="width:32px;"></th>
+                            <th>BOM번호</th>
+                            <th>제품코드</th>
+                            <th>제품명</th>
+                            <th>버전</th>
+                            <th class="text-center">자재수</th>
+                            <th class="text-center">상태</th>
+                            <th>등록일</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach (var bom in Model.Boms)
+                    {
+                        <tr data-bs-toggle="collapse"
+                            data-bs-target="#bom-@bom.Id"
+                            aria-expanded="false"
+                            aria-controls="bom-@bom.Id"
+                            style="cursor:pointer;"
+                            class="bom-header-row">
+                            <td class="ps-3">
+                                <i class="bi bi-chevron-right bom-chevron transition-transform" style="font-size:12px;transition:transform .2s;"></i>
+                            </td>
+                            <td><span class="fw-semibold text-primary">@bom.BomNo</span></td>
+                            <td><code>@bom.ProductCode</code></td>
+                            <td>@bom.ProductName</td>
+                            <td><span class="badge bg-light text-dark border">v@bom.Version</span></td>
+                            <td class="text-center">
+                                <span class="badge bg-info bg-opacity-75 text-dark">@bom.Items.Count</span>
+                            </td>
+                            <td class="text-center">
+                                @if (bom.IsActive)
+                                {
+                                    <span class="badge bg-success">활성</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">비활성</span>
+                                }
+                            </td>
+                            <td class="text-muted small">@bom.CreatedAt.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                        <!-- 자재 상세 펼침 행 -->
+                        <tr class="collapse" id="bom-@bom.Id">
+                            <td colspan="8" class="p-0 border-top-0">
+                                <div class="bg-light border-bottom">
+                                    @if (!bom.Items.Any())
+                                    {
+                                        <div class="text-muted small text-center py-3">
+                                            <i class="bi bi-info-circle me-1"></i>자재 항목이 없습니다.
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <table class="table table-sm table-bordered mb-0 small">
+                                            <thead class="table-secondary">
+                                                <tr>
+                                                    <th class="text-center ps-4" style="width:60px;">순번</th>
+                                                    <th>자재코드</th>
+                                                    <th>자재명</th>
+                                                    <th class="text-end">소요량</th>
+                                                    <th>단위</th>
+                                                    <th>비고</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                            @foreach (var item in bom.Items)
+                                            {
+                                                <tr>
+                                                    <td class="text-center ps-4">@item.ItemNo</td>
+                                                    <td><code>@item.MaterialCode</code></td>
+                                                    <td>@item.MaterialName</td>
+                                                    <td class="text-end">@item.Quantity.ToString("G29")</td>
+                                                    <td>@item.Unit</td>
+                                                    <td class="text-muted">@item.Remark</td>
+                                                </tr>
+                                            }
+                                            </tbody>
+                                        </table>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+<script>
+// 펼침/접힘 시 화살표 회전
+document.querySelectorAll('.bom-header-row').forEach(function(row) {
+    var target = row.getAttribute('data-bs-target');
+    var collapseEl = document.querySelector(target);
+    if (!collapseEl) return;
+    var chevron = row.querySelector('.bom-chevron');
+
+    collapseEl.addEventListener('show.bs.collapse', function() {
+        if (chevron) chevron.style.transform = 'rotate(90deg)';
+        row.classList.add('table-active');
+    });
+    collapseEl.addEventListener('hide.bs.collapse', function() {
+        if (chevron) chevron.style.transform = '';
+        row.classList.remove('table-active');
+    });
+});
+</script>
+}

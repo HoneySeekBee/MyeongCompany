@@ -2,11 +2,14 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MSMES.Application.Common;
 using MSMES.Application.Dashboard;
+using MSMES.Domain.Alert;
+using MSMES.Domain.Bom;
 using MSMES.Domain.Common;
 using MSMES.Domain.Equipment;
 using MSMES.Domain.Inventory;
 using MSMES.Domain.LotManagement;
 using MSMES.Domain.Process;
+using MSMES.Domain.ProductionPlan;
 using MSMES.Domain.PurchaseOrder;
 using MSMES.Domain.Quality;
 using MSMES.Domain.SalesOrder;
@@ -37,6 +40,9 @@ public static class DependencyInjection
         services.AddScoped<IProcessRepository, SqlProcessRepository>();
         services.AddScoped<IDashboardRepository, SqlDashboardRepository>();
         services.AddScoped<IAuditLogRepository, SqlAuditLogRepository>();
+        services.AddScoped<IBomRepository, SqlBomRepository>();
+        services.AddScoped<IProductionPlanRepository, SqlProductionPlanRepository>();
+        services.AddScoped<IAlertRepository, SqlAlertRepository>();
 
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
         // Application.Common 인터페이스로 등록 (Application 레이어에서 주입 가능)

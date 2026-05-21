@@ -1,0 +1,165 @@
+@page
+@model MSMES.Web.Pages.ProductionPlan.IndexModel
+@{
+    ViewData["Title"] = "생산계획";
+    var today = DateTime.Today;
+    var totalDays = Model.TotalDays;
+    var ganttStart = Model.GanttStart;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">생산계획</h1>
+    <div class="d-flex gap-2">
+        <span class="badge bg-primary">진행중</span>
+        <span class="badge bg-secondary">계획</span>
+        <span class="badge bg-success">완료</span>
+        <span class="badge bg-danger">취소</span>
+    </div>
+</div>
+
+<!-- Summary KPIs -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">전체</div>
+            <div class="h3 fw-bold mb-0">@Model.Plans.Count</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">진행중</div>
+            <div class="h3 fw-bold mb-0 text-primary">@Model.Plans.Count(p => p.Status == 1)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">긴급</div>
+            <div class="h3 fw-bold mb-0 text-danger">@Model.Plans.Count(p => p.Priority == 3)</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">완료</div>
+            <div class="h3 fw-bold mb-0 text-success">@Model.Plans.Count(p => p.Status == 2)</div>
+        </div>
+    </div>
+</div>
+
+<!-- Gantt Chart -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="gantt-wrapper" style="overflow-x:auto;">
+            <table class="gantt-table" style="min-width:900px; width:100%; border-collapse:collapse;">
+                <colgroup>
+                    <col style="width:180px"><!-- 제품명 -->
+                    <col style="width:80px"> <!-- 라인 -->
+                    <col style="width:60px"> <!-- 우선순위 -->
+                    @for (int d = 0; d < totalDays; d++)
+                    {
+                        <col style="width:@(Math.Max(28, 700/totalDays))px">
+                    }
+                </colgroup>
+                <thead>
+                    <!-- Month row -->
+                    <tr style="background:#1e2a3a; color:#fff;">
+                        <th class="px-3 py-2" style="font-size:.8rem;">제품명</th>
+                        <th class="px-2 py-2" style="font-size:.8rem;">라인</th>
+                        <th class="px-2 py-2" style="font-size:.8rem;">우선순위</th>
+                        @{
+                            var lastMonth = -1;
+                            var monthSpan = 0;
+                            var monthCells = new List<(string label, int span)>();
+                            for (int d = 0; d < totalDays; d++)
+                            {
+                                var dt = ganttStart.AddDays(d);
+                                if (dt.Month != lastMonth)
+                                {
+                                    if (lastMonth != -1)
+                                        monthCells.Add((ganttStart.AddDays(d - monthSpan).ToString("M월"), monthSpan));
+                                    lastMonth = dt.Month;
+                                    monthSpan = 1;
+                                }
+                                else
+                                {
+                                    monthSpan++;
+                                }
+                            }
+                            monthCells.Add((ganttStart.AddDays(totalDays - monthSpan).ToString("M월"), monthSpan));
+                        }
+                        @foreach (var mc in monthCells)
+                        {
+                            <th colspan="@mc.span" class="text-center py-2 border-start" style="font-size:.8rem;">@mc.label</th>
+                        }
+                    </tr>
+                    <!-- Day row -->
+                    <tr style="background:#27374d; color:#ccc; font-size:.72rem;">
+                        <th></th><th></th><th></th>
+                        @for (int d = 0; d < totalDays; d++)
+                        {
+                            var dt = ganttStart.AddDays(d);
+                            var isToday = dt.Date == today;
+                            var isWeekend = dt.DayOfWeek == DayOfWeek.Saturday || dt.DayOfWeek == DayOfWeek.Sunday;
+                            <th class="text-center py-1 @(isToday ? "today-col" : "")"
+                                style="@(isWeekend ? "color:#f39c12;" : "") @(isToday ? "background:#1a73e8;color:#fff;" : "")">
+                                @dt.Day
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var plan in Model.Plans)
+                {
+                    var barColor = plan.Status switch { 1 => "#3498db", 2 => "#27ae60", 3 => "#e74c3c", _ => "#95a5a6" };
+                    var priorityBadge = plan.Priority switch
+                    {
+                        3 => "<span class='badge bg-danger' style='font-size:.65rem;'>긴급</span>",
+                        2 => "<span class='badge bg-warning text-dark' style='font-size:.65rem;'>높음</span>",
+                        _ => "<span class='badge bg-secondary' style='font-size:.65rem;'>보통</span>"
+                    };
+                    <tr style="border-bottom:1px solid #f0f2f5;">
+                        <td class="px-3 py-2" style="font-size:.82rem; white-space:nowrap; overflow:hidden; max-width:180px; text-overflow:ellipsis;" title="@plan.ProductName">
+                            <div class="fw-medium">@plan.ProductName</div>
+                            <div class="text-muted" style="font-size:.72rem;">@plan.PlanNo</div>
+                        </td>
+                        <td class="px-2 py-2" style="font-size:.78rem;">@plan.Line</td>
+                        <td class="px-2 py-2">@Html.Raw(priorityBadge)</td>
+                        @for (int d = 0; d < totalDays; d++)
+                        {
+                            var dt = ganttStart.AddDays(d);
+                            var isToday2 = dt.Date == today;
+                            var inRange = dt.Date >= plan.StartDate.Date && dt.Date <= plan.EndDate.Date;
+                            var isStart = dt.Date == plan.StartDate.Date;
+                            var isEnd   = dt.Date == plan.EndDate.Date;
+                            var isWeekend2 = dt.DayOfWeek == DayOfWeek.Saturday || dt.DayOfWeek == DayOfWeek.Sunday;
+                            <td style="padding:4px 1px; @(isToday2 ? "background:rgba(26,115,232,.08);" : "") @(isWeekend2 ? "background:#fafafa;" : "")">
+                                @if (inRange)
+                                {
+                                    var radius = isStart && isEnd ? "6px" : isStart ? "6px 0 0 6px" : isEnd ? "0 6px 6px 0" : "0";
+                                    <div style="height:22px; background:@barColor; border-radius:@radius; opacity:0.85;
+                                                @(plan.Priority == 3 ? "box-shadow:0 0 0 2px #e74c3c; animation:urgentPulse 1.4s ease-in-out infinite;" : "")"></div>
+                                }
+                            </td>
+                        }
+                    </tr>
+                }
+                @if (!Model.Plans.Any())
+                {
+                    <tr><td colspan="@(totalDays+3)" class="text-center text-muted py-5">등록된 생산계획이 없습니다.</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+<style>
+.gantt-table td, .gantt-table th { border-right: 1px solid #e9ecef; }
+.gantt-table tbody tr:hover { background: #f8f9fb !important; }
+
+@@keyframes urgentPulse {
+    0%, 100% { box-shadow: 0 0 0 2px #e74c3c; }
+    50%       { box-shadow: 0 0 0 4px rgba(231,76,60,.4); }
+}
+</style>
+}

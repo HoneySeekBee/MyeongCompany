@@ -130,6 +130,20 @@
                         <span class="ms-sidebar__link-text">공정관리</span>
                     </a>
                 }
+                @if (isAdmin || isManager || isWorker)
+                {
+                    <a href="/Bom" class="ms-sidebar__link" aria-label="BOM 관리">
+                        <i class="bi bi-diagram-3-fill"></i>
+                        <span class="ms-sidebar__link-text">BOM 관리</span>
+                    </a>
+                }
+                @if (isAdmin || isManager || isWorker)
+                {
+                    <a href="/ProductionPlan" class="ms-sidebar__link" aria-label="생산계획">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="ms-sidebar__link-text">생산계획</span>
+                    </a>
+                }
             }
 
             @if (showLogisticsGroup)
@@ -181,6 +195,16 @@
             @if (isAdmin || isManager)
             {
                 <hr class="ms-sidebar__divider" />
+                <div class="ms-sidebar__group-label">보고서</div>
+                <a href="/Reports" class="ms-sidebar__link" aria-label="통합 보고서">
+                    <i class="bi bi-file-earmark-bar-graph"></i>
+                    <span class="ms-sidebar__link-text">통합 보고서</span>
+                </a>
+            }
+
+            @if (isAdmin || isManager)
+            {
+                <hr class="ms-sidebar__divider" />
                 <div class="ms-sidebar__group-label">시스템 관리</div>
                 @if (isAdmin)
                 {
@@ -192,6 +216,10 @@
                 <a href="/Admin/AuditLogs" class="ms-sidebar__link" aria-label="감사 로그">
                     <i class="bi bi-journal-text"></i>
                     <span class="ms-sidebar__link-text">감사 로그</span>
+                </a>
+                <a href="/Alerts" class="ms-sidebar__link" aria-label="알람/경보">
+                    <i class="bi bi-bell"></i>
+                    <span class="ms-sidebar__link-text">알람/경보</span>
                 </a>
             }
 
@@ -223,13 +251,12 @@
             <h1 class="ms-header__title">@pageTitle</h1>
 
             <div class="ms-header__actions">
-                <!-- 알림 -->
-                <button type="button" class="btn btn-sm btn-light position-relative" aria-label="알림" title="알림">
+                <!-- 알림/경보 벨 -->
+                <a href="/Alerts" class="btn btn-sm btn-light position-relative" aria-label="알람/경보" title="알람/경보">
                     <i class="bi bi-bell"></i>
-                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px;">
-                        3<span class="visually-hidden">개의 읽지 않은 알림</span>
-                    </span>
-                </button>
+                    <span id="alert-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                          style="font-size:9px;"></span>
+                </a>
 
                 <!-- 사용자 정보 + Role 뱃지 (드롭다운) -->
                 <div class="dropdown">
@@ -313,5 +340,18 @@
 </script>
 
 @await RenderSectionAsync("Scripts", required: false)
+
+<!-- 알람 뱃지 카운트 로드 -->
+<script>
+(async function loadAlertBadge() {
+    try {
+        const r = await fetch('/api/alerts/count');
+        if (!r.ok) return;
+        const { count } = await r.json();
+        const badge = document.getElementById('alert-badge');
+        if (badge) badge.textContent = count > 0 ? count : '';
+    } catch {}
+})();
+</script>
 </body>
 </html>
