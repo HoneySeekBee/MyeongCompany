@@ -10,9 +10,20 @@ public class SalesOrder : Entity
     public DateTime OrderDate { get; set; }
     public DateTime DueDate { get; set; }
     public SalesOrderStatus Status { get; set; } = SalesOrderStatus.Draft;
+    public string? Note { get; set; }
     public List<SalesOrderItem> Items { get; set; } = new();
 
     public decimal TotalAmount => Items.Sum(i => i.Amount);
+
+    public string StatusName => Status switch
+    {
+        SalesOrderStatus.Draft        => "초안",
+        SalesOrderStatus.Confirmed    => "확정",
+        SalesOrderStatus.InProduction => "생산중",
+        SalesOrderStatus.Shipped      => "출하완료",
+        SalesOrderStatus.Closed       => "마감",
+        _                             => Status.ToString()
+    };
 
     public void Confirm()
     {

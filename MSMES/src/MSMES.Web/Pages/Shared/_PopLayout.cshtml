@@ -1,0 +1,498 @@
+@using System.Security.Claims
+@{
+    var userName = User.FindFirstValue("UserName") ?? User.Identity?.Name ?? "작업자";
+}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>MSMES POP 단말기</title>
+
+    <!-- Google Fonts: Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- Bootstrap 5.3 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous" />
+
+    <!-- Bootstrap Icons 1.11 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+
+    <style>
+        /* ====================================================
+           POP 전용 테마 - 어두운 공장 스타일
+        ==================================================== */
+        :root {
+            --pop-bg:          #0d1117;
+            --pop-surface:     #161b22;
+            --pop-surface-2:   #1c2333;
+            --pop-border:      #30363d;
+            --pop-text:        #e6edf3;
+            --pop-text-muted:  #8b949e;
+            --pop-blue:        #1f6feb;
+            --pop-blue-light:  #388bfd;
+            --pop-green:       #238636;
+            --pop-green-light: #3fb950;
+            --pop-orange:      #d29922;
+            --pop-red:         #da3633;
+            --pop-header-h:    72px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: var(--pop-bg);
+            color: var(--pop-text);
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 16px;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        /* ── 헤더 ── */
+        .pop-header {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: var(--pop-header-h);
+            background: var(--pop-surface);
+            border-bottom: 2px solid var(--pop-blue);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            z-index: 1000;
+            gap: 16px;
+        }
+
+        .pop-header__brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.3rem;
+            font-weight: 800;
+            color: var(--pop-blue-light);
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .pop-header__brand i { font-size: 1.5rem; }
+
+        .pop-header__title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--pop-text-muted);
+            flex: 1;
+            text-align: center;
+        }
+
+        .pop-header__right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            white-space: nowrap;
+        }
+
+        .pop-clock {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: var(--pop-green-light);
+            letter-spacing: 0.05em;
+        }
+
+        .pop-header__back {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: var(--pop-surface-2);
+            border: 1px solid var(--pop-border);
+            border-radius: 8px;
+            color: var(--pop-text-muted);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: background 0.15s, color 0.15s;
+        }
+        .pop-header__back:hover { background: var(--pop-border); color: var(--pop-text); }
+
+        /* ── 메인 콘텐츠 ── */
+        .pop-main {
+            padding-top: calc(var(--pop-header-h) + 24px);
+            padding-bottom: 32px;
+            min-height: 100vh;
+        }
+
+        /* ── 작업카드 그리드 ── */
+        .pop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+            padding: 0 20px;
+        }
+
+        .pop-card {
+            background: var(--pop-surface);
+            border-radius: 12px;
+            border: 2px solid var(--pop-border);
+            padding: 20px 22px;
+            cursor: pointer;
+            transition: transform 0.12s, border-color 0.12s, box-shadow 0.12s;
+            user-select: none;
+        }
+        .pop-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .pop-card:active { transform: translateY(0); }
+
+        /* Released: 파란 테두리 */
+        .pop-card--released {
+            border-color: var(--pop-blue);
+            box-shadow: 0 0 0 1px rgba(31,111,235,0.25);
+        }
+        /* InProgress: 초록 테두리 */
+        .pop-card--inprogress {
+            border-color: var(--pop-green-light);
+            box-shadow: 0 0 0 1px rgba(63,185,80,0.25);
+        }
+
+        .pop-card__header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .pop-card__wo-no {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--pop-text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pop-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+        }
+        .pop-status-badge--released {
+            background: rgba(31,111,235,0.2);
+            color: var(--pop-blue-light);
+            border: 1px solid var(--pop-blue);
+        }
+        .pop-status-badge--inprogress {
+            background: rgba(63,185,80,0.2);
+            color: var(--pop-green-light);
+            border: 1px solid var(--pop-green-light);
+        }
+
+        .pop-card__item-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--pop-text);
+            margin-bottom: 14px;
+            line-height: 1.3;
+        }
+
+        .pop-card__qty-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 14px;
+            font-size: 0.95rem;
+        }
+        .pop-card__qty-label {
+            color: var(--pop-text-muted);
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+        .pop-card__qty-value {
+            font-size: 1.15rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* 프로그레스 바 */
+        .pop-progress-wrap {
+            background: var(--pop-surface-2);
+            border-radius: 6px;
+            height: 12px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+        .pop-progress-bar {
+            height: 100%;
+            border-radius: 6px;
+            transition: width 0.4s ease;
+        }
+        .pop-progress-bar--released  { background: var(--pop-blue-light); }
+        .pop-progress-bar--inprogress { background: var(--pop-green-light); }
+
+        .pop-progress-text {
+            text-align: right;
+            font-size: 0.85rem;
+            color: var(--pop-text-muted);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .pop-card__action-btn {
+            width: 100%;
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: opacity 0.15s;
+        }
+        .pop-card__action-btn:hover { opacity: 0.85; }
+        .pop-card__action-btn--released {
+            background: var(--pop-blue);
+            color: #fff;
+        }
+        .pop-card__action-btn--inprogress {
+            background: var(--pop-green);
+            color: #fff;
+        }
+
+        /* ── 빈 상태 ── */
+        .pop-empty {
+            text-align: center;
+            padding: 80px 20px;
+            color: var(--pop-text-muted);
+        }
+        .pop-empty i { font-size: 4rem; margin-bottom: 16px; display: block; }
+        .pop-empty p { font-size: 1.1rem; }
+
+        /* ── 모달 공통 ── */
+        .modal-content {
+            background: var(--pop-surface);
+            color: var(--pop-text);
+            border: 1px solid var(--pop-border);
+            border-radius: 12px;
+        }
+        .modal-header {
+            border-bottom: 1px solid var(--pop-border);
+            padding: 18px 22px;
+        }
+        .modal-title { font-size: 1.2rem; font-weight: 700; }
+        .modal-body  { padding: 22px; }
+        .modal-footer {
+            border-top: 1px solid var(--pop-border);
+            padding: 14px 22px;
+            gap: 10px;
+        }
+        .btn-close { filter: invert(1); }
+
+        /* ── 상세 모달 정보 행 ── */
+        .pop-detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--pop-border);
+            font-size: 1rem;
+        }
+        .pop-detail-row:last-child { border-bottom: none; }
+        .pop-detail-label { color: var(--pop-text-muted); font-weight: 500; }
+        .pop-detail-value { font-weight: 600; text-align: right; }
+
+        /* ── 액션 버튼 (터치 최적화) ── */
+        .pop-action-btn {
+            width: 100%;
+            padding: 16px 20px;
+            border-radius: 10px;
+            font-size: 1.05rem;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: opacity 0.15s, transform 0.1s;
+            min-height: 56px;
+        }
+        .pop-action-btn:active { transform: scale(0.98); }
+        .pop-action-btn:hover { opacity: 0.88; }
+        .pop-action-btn--start    { background: var(--pop-blue);   color: #fff; }
+        .pop-action-btn--produce  { background: var(--pop-orange);  color: #fff; }
+        .pop-action-btn--complete { background: var(--pop-green);   color: #fff; }
+        .pop-action-btn--cancel   { background: var(--pop-surface-2); color: var(--pop-text-muted); border: 1px solid var(--pop-border); }
+
+        /* ── 숫자패드 ── */
+        .numpad-display {
+            background: var(--pop-bg);
+            border: 1px solid var(--pop-border);
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-size: 2rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            text-align: right;
+            min-height: 64px;
+            color: var(--pop-text);
+            margin-bottom: 12px;
+            letter-spacing: 0.03em;
+        }
+        .numpad-display.active { border-color: var(--pop-blue-light); }
+
+        .numpad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .numpad-btn {
+            background: var(--pop-surface-2);
+            border: 1px solid var(--pop-border);
+            border-radius: 10px;
+            color: var(--pop-text);
+            font-size: 1.4rem;
+            font-weight: 700;
+            padding: 0;
+            height: 62px;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.08s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .numpad-btn:active { transform: scale(0.94); background: var(--pop-border); }
+        .numpad-btn--backspace { font-size: 1.1rem; color: var(--pop-orange); }
+        .numpad-btn--clear     { font-size: 1rem;   color: var(--pop-red);    }
+        .numpad-btn--zero      { grid-column: span 2; }
+
+        /* 입력 필드 섹션 레이블 */
+        .pop-input-label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--pop-text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
+        }
+        .pop-input-active-indicator {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--pop-blue-light);
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .pop-note-input {
+            background: var(--pop-surface-2);
+            border: 1px solid var(--pop-border);
+            border-radius: 8px;
+            color: var(--pop-text);
+            padding: 12px 14px;
+            font-size: 1rem;
+            width: 100%;
+            resize: none;
+        }
+        .pop-note-input:focus {
+            outline: none;
+            border-color: var(--pop-blue-light);
+        }
+        .pop-note-input::placeholder { color: var(--pop-text-muted); }
+
+        /* ── 갱신 인디케이터 ── */
+        .pop-refresh-bar {
+            position: fixed;
+            top: var(--pop-header-h);
+            left: 0; right: 0;
+            height: 3px;
+            background: transparent;
+            z-index: 999;
+        }
+        .pop-refresh-bar.refreshing {
+            background: linear-gradient(90deg, var(--pop-blue-light) 0%, var(--pop-green-light) 100%);
+            animation: slideRefresh 0.6s ease forwards;
+        }
+        @@keyframes slideRefresh {
+            from { transform: scaleX(0); transform-origin: left; }
+            to   { transform: scaleX(1); transform-origin: left; }
+        }
+
+        /* ── 반응형 ── */
+        @@media (max-width: 576px) {
+            .pop-grid { grid-template-columns: 1fr; padding: 0 12px; }
+            .pop-clock { font-size: 1.2rem; }
+            .pop-header__title { display: none; }
+            .pop-header { padding: 0 14px; }
+        }
+    </style>
+
+    @await RenderSectionAsync("Styles", required: false)
+</head>
+<body>
+
+<!-- 갱신 애니메이션 바 -->
+<div class="pop-refresh-bar" id="popRefreshBar"></div>
+
+<!-- ══════════════════════════
+     POP 헤더
+══════════════════════════ -->
+<header class="pop-header" role="banner">
+    <a href="/Pop" class="pop-header__brand">
+        <i class="bi bi-display-fill"></i>
+        <span>MSMES POP</span>
+    </a>
+
+    <div class="pop-header__title">
+        <i class="bi bi-factory me-2"></i>공정 현황판
+    </div>
+
+    <div class="pop-header__right">
+        <div class="pop-clock" id="popClock" aria-live="polite" aria-label="현재 시각">--:--:--</div>
+        <a href="/" class="pop-header__back" aria-label="MES 메인으로">
+            <i class="bi bi-arrow-left"></i>
+            <span class="d-none d-sm-inline">메인으로</span>
+        </a>
+    </div>
+</header>
+
+<!-- 메인 콘텐츠 -->
+<main class="pop-main" role="main" id="popMain">
+    @RenderBody()
+</main>
+
+<!-- Bootstrap 5.3 JS Bundle -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc4s9bIOgUxi8T/jzmUXCfAA3oGMlX2F8vaXIbAZLkJ" crossorigin="anonymous"></script>
+
+<!-- 공통 유틸 -->
+<script>
+    // 실시간 시계
+    (function initClock() {
+        function tick() {
+            var now = new Date();
+            var hh = String(now.getHours()).padStart(2, '0');
+            var mm = String(now.getMinutes()).padStart(2, '0');
+            var ss = String(now.getSeconds()).padStart(2, '0');
+            var el = document.getElementById('popClock');
+            if (el) el.textContent = hh + ':' + mm + ':' + ss;
+        }
+        tick();
+        setInterval(tick, 1000);
+    })();
+</script>
+
+@await RenderSectionAsync("Scripts", required: false)
+
+</body>
+</html>

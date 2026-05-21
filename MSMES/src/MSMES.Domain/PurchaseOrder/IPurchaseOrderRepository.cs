@@ -10,4 +10,5 @@ public interface IPurchaseOrderRepository
     Task AddAsync(PurchaseOrder po, CancellationToken ct = default);
     Task UpdateAsync(PurchaseOrder po, CancellationToken ct = default);
     Task<string> NextNumberAsync(CancellationToken ct = default);
+    Task DeleteAsync(string purchaseOrderNo, CancellationToken ct = default);
 }

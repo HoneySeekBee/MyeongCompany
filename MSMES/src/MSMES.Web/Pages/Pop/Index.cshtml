@@ -1,0 +1,556 @@
+@page
+@model MSMES.Web.Pages.Pop.IndexModel
+@{
+    Layout = "_PopLayout";
+}
+
+<!-- 작업카드 그리드 -->
+<div id="popGrid" class="pop-grid">
+@if (!Model.ActiveOrders.Any())
+{
+    <div class="pop-empty" style="grid-column: 1 / -1;">
+        <i class="bi bi-check2-circle text-success"></i>
+        <p>현재 활성 작업지시가 없습니다.</p>
+        <small class="text-muted">상태가 <strong>해제(Released)</strong> 또는 <strong>진행중(InProgress)</strong>인 작업지시가 표시됩니다.</small>
+    </div>
+}
+else
+{
+    foreach (var wo in Model.ActiveOrders)
+    {
+        var isReleased   = wo.Status == MSMES.Domain.WorkOrder.WorkOrderStatus.Released;
+        var cardClass    = isReleased ? "pop-card--released"   : "pop-card--inprogress";
+        var badgeClass   = isReleased ? "pop-status-badge--released" : "pop-status-badge--inprogress";
+        var badgeIcon    = isReleased ? "bi-play-circle"        : "bi-gear-wide-connected";
+        var badgeText    = isReleased ? "해제"                  : "진행중";
+        var progressClass= isReleased ? "pop-progress-bar--released" : "pop-progress-bar--inprogress";
+        var btnClass     = isReleased ? "pop-card__action-btn--released" : "pop-card__action-btn--inprogress";
+        var btnIcon      = isReleased ? "bi-play-fill"          : "bi-tools";
+        var btnText      = isReleased ? "작업 시작"              : "작업 관리";
+        var progressPct  = (double)wo.ProgressRate;
+
+        <div class="pop-card @cardClass"
+             onclick="openDetailModal('@wo.WorkOrderNo')"
+             role="button" tabindex="0"
+             aria-label="작업지시 @wo.WorkOrderNo 상세보기"
+             onkeydown="if(event.key==='Enter'||event.key===' ')openDetailModal('@wo.WorkOrderNo')">
+
+            <div class="pop-card__header">
+                <span class="pop-card__wo-no">@wo.WorkOrderNo</span>
+                <span class="pop-status-badge @badgeClass">
+                    <i class="bi @badgeIcon"></i>@badgeText
+                </span>
+            </div>
+
+            <div class="pop-card__item-name">@wo.ItemName</div>
+
+            <div class="pop-card__qty-row">
+                <div>
+                    <div class="pop-card__qty-label">계획수량</div>
+                    <div class="pop-card__qty-value">@(wo.PlannedQuantity.ToString("N0"))개</div>
+                </div>
+                <div>
+                    <div class="pop-card__qty-label">생산수량</div>
+                    <div class="pop-card__qty-value">@(wo.ProducedQuantity.ToString("N0"))개</div>
+                </div>
+                @if (!string.IsNullOrEmpty(wo.ProcessCode))
+                {
+                    <div>
+                        <div class="pop-card__qty-label">공정</div>
+                        <div class="pop-card__qty-value" style="font-size:0.95rem;">@wo.ProcessCode</div>
+                    </div>
+                }
+            </div>
+
+            <div class="pop-progress-wrap">
+                <div class="pop-progress-bar @progressClass" style="width:@(progressPct.ToString("F0"))%;"></div>
+            </div>
+            <div class="pop-progress-text">@(progressPct.ToString("F1"))%</div>
+
+            <button class="pop-card__action-btn @btnClass" type="button"
+                    onclick="event.stopPropagation(); openDetailModal('@wo.WorkOrderNo')"
+                    aria-label="@btnText">
+                <i class="bi @btnIcon"></i>@btnText
+            </button>
+        </div>
+    }
+}
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     상세/액션 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalDetail" tabindex="-1"
+     aria-labelledby="modalDetailLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalDetailLabel">
+                    <i class="bi bi-gear me-2"></i>
+                    <span id="detailWoNo">작업지시 상세</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body" id="detailModalBody">
+                <!-- JS로 채워짐 -->
+            </div>
+            <div class="modal-footer" id="detailModalFooter">
+                <!-- JS로 채워짐 -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════
+     생산수량 입력 모달
+══════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalProduce" tabindex="-1"
+     aria-labelledby="modalProduceLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalProduceLabel">
+                    <i class="bi bi-calculator me-2"></i>생산수량 입력
+                </h5>
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+
+                <!-- 생산수량 -->
+                <div class="mb-4">
+                    <div class="pop-input-label">
+                        생산수량 (개)
+                        <span class="pop-input-active-indicator" id="produceActiveIndicator"></span>
+                    </div>
+                    <div class="numpad-display active" id="displayProduce"
+                         onclick="setActiveField('produce')" role="textbox" aria-label="생산수량">0</div>
+                </div>
+
+                <!-- 불량수량 -->
+                <div class="mb-4">
+                    <div class="pop-input-label">불량수량 (개)</div>
+                    <div class="numpad-display" id="displayDefect"
+                         onclick="setActiveField('defect')" role="textbox" aria-label="불량수량">0</div>
+                </div>
+
+                <!-- 숫자패드 -->
+                <div class="numpad-grid mb-4" id="numpad">
+                    <button class="numpad-btn" type="button" data-digit="7">7</button>
+                    <button class="numpad-btn" type="button" data-digit="8">8</button>
+                    <button class="numpad-btn" type="button" data-digit="9">9</button>
+                    <button class="numpad-btn" type="button" data-digit="4">4</button>
+                    <button class="numpad-btn" type="button" data-digit="5">5</button>
+                    <button class="numpad-btn" type="button" data-digit="6">6</button>
+                    <button class="numpad-btn" type="button" data-digit="1">1</button>
+                    <button class="numpad-btn" type="button" data-digit="2">2</button>
+                    <button class="numpad-btn" type="button" data-digit="3">3</button>
+                    <button class="numpad-btn numpad-btn--clear" type="button" data-digit="C">C</button>
+                    <button class="numpad-btn numpad-btn--zero" type="button" data-digit="0">0</button>
+                    <button class="numpad-btn numpad-btn--backspace" type="button" data-digit="BS">
+                        <i class="bi bi-backspace"></i>
+                    </button>
+                </div>
+
+                <!-- 비고 -->
+                <div>
+                    <div class="pop-input-label">비고</div>
+                    <textarea id="produceNote" class="pop-note-input" rows="2"
+                              placeholder="특이사항을 입력하세요 (선택)"></textarea>
+                </div>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="pop-action-btn pop-action-btn--cancel"
+                        data-bs-dismiss="modal" style="width:auto; min-width:100px;">
+                    취소
+                </button>
+                <button type="button" class="pop-action-btn pop-action-btn--produce"
+                        id="btnSaveProduce" onclick="saveProduce()" style="flex:1;">
+                    <i class="bi bi-check-lg"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast 컨테이너 -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;" id="popToastContainer"></div>
+
+@section Scripts {
+<script>
+// ══════════════════════════════════════════════════
+// POP 전역 상태
+// ══════════════════════════════════════════════════
+var popState = {
+    currentWo:    null,       // 현재 열린 WO 객체
+    activeField:  'produce',  // 'produce' | 'defect'
+    produceVal:   '0',
+    defectVal:    '0',
+    refreshTimer: null
+};
+
+// ══════════════════════════════════════════════════
+// 자동 갱신 (5초)
+// ══════════════════════════════════════════════════
+function startAutoRefresh() {
+    popState.refreshTimer = setInterval(refreshGrid, 5000);
+}
+
+async function refreshGrid() {
+    var bar = document.getElementById('popRefreshBar');
+    if (bar) { bar.classList.add('refreshing'); }
+
+    try {
+        var res = await fetch('/api/workorders?status=Released&status=InProgress&take=200');
+        if (!res.ok) return;
+        var list = await res.json();
+
+        renderGrid(list);
+    } catch (e) {
+        console.warn('POP 갱신 실패:', e);
+    } finally {
+        if (bar) { setTimeout(function() { bar.classList.remove('refreshing'); }, 700); }
+    }
+}
+
+function renderGrid(orders) {
+    var grid = document.getElementById('popGrid');
+    if (!grid) return;
+
+    if (!orders || orders.length === 0) {
+        grid.innerHTML = '<div class="pop-empty" style="grid-column:1/-1;">'
+            + '<i class="bi bi-check2-circle text-success"></i>'
+            + '<p>현재 활성 작업지시가 없습니다.</p>'
+            + '</div>';
+        return;
+    }
+
+    // Released 먼저, 그 다음 InProgress
+    orders.sort(function(a, b) {
+        var order = { 'Released': 0, 'InProgress': 1 };
+        var oa = order[a.status] ?? 9;
+        var ob = order[b.status] ?? 9;
+        if (oa !== ob) return oa - ob;
+        return new Date(a.startDate) - new Date(b.startDate);
+    });
+
+    grid.innerHTML = orders.map(function(wo) {
+        var isRel       = wo.status === 'Released';
+        var cardCls     = isRel ? 'pop-card--released' : 'pop-card--inprogress';
+        var badgeCls    = isRel ? 'pop-status-badge--released' : 'pop-status-badge--inprogress';
+        var badgeIcon   = isRel ? 'bi-play-circle' : 'bi-gear-wide-connected';
+        var badgeText   = isRel ? '해제' : '진행중';
+        var barCls      = isRel ? 'pop-progress-bar--released' : 'pop-progress-bar--inprogress';
+        var btnCls      = isRel ? 'pop-card__action-btn--released' : 'pop-card__action-btn--inprogress';
+        var btnIcon     = isRel ? 'bi-play-fill' : 'bi-tools';
+        var btnText     = isRel ? '작업 시작' : '작업 관리';
+        var pct         = (wo.progressRate || 0).toFixed(1);
+        var processHtml = wo.processCode
+            ? '<div><div class="pop-card__qty-label">공정</div><div class="pop-card__qty-value" style="font-size:0.95rem;">' + esc(wo.processCode) + '</div></div>'
+            : '';
+
+        return '<div class="pop-card ' + cardCls + '" onclick="openDetailModal(\'' + esc(wo.workOrderNo) + '\')"'
+            + ' role="button" tabindex="0"'
+            + ' onkeydown="if(event.key===\'Enter\'||event.key===\' \')openDetailModal(\'' + esc(wo.workOrderNo) + '\')">'
+            + '<div class="pop-card__header">'
+            +   '<span class="pop-card__wo-no">' + esc(wo.workOrderNo) + '</span>'
+            +   '<span class="pop-status-badge ' + badgeCls + '"><i class="bi ' + badgeIcon + '"></i>' + badgeText + '</span>'
+            + '</div>'
+            + '<div class="pop-card__item-name">' + esc(wo.itemName || wo.itemCode) + '</div>'
+            + '<div class="pop-card__qty-row">'
+            +   '<div><div class="pop-card__qty-label">계획수량</div><div class="pop-card__qty-value">' + fmtNum(wo.plannedQuantity) + '개</div></div>'
+            +   '<div><div class="pop-card__qty-label">생산수량</div><div class="pop-card__qty-value">' + fmtNum(wo.producedQuantity) + '개</div></div>'
+            +   processHtml
+            + '</div>'
+            + '<div class="pop-progress-wrap"><div class="pop-progress-bar ' + barCls + '" style="width:' + pct + '%;"></div></div>'
+            + '<div class="pop-progress-text">' + pct + '%</div>'
+            + '<button class="pop-card__action-btn ' + btnCls + '" type="button"'
+            +   ' onclick="event.stopPropagation();openDetailModal(\'' + esc(wo.workOrderNo) + '\')">'
+            +   '<i class="bi ' + btnIcon + '"></i>' + btnText
+            + '</button>'
+            + '</div>';
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════
+// 상세 모달
+// ══════════════════════════════════════════════════
+async function openDetailModal(woNo) {
+    try {
+        var res = await fetch('/api/workorders/' + encodeURIComponent(woNo));
+        if (!res.ok) { showPopToast('작업지시를 불러올 수 없습니다.', 'danger'); return; }
+        var wo = await res.json();
+        popState.currentWo = wo;
+
+        document.getElementById('detailWoNo').textContent = wo.workOrderNo;
+
+        var pct     = (wo.progressRate || 0).toFixed(1);
+        var isRel   = wo.status === 'Released';
+        var isInPrg = wo.status === 'InProgress';
+        var barCls  = isRel ? 'pop-progress-bar--released' : 'pop-progress-bar--inprogress';
+
+        // 본문
+        document.getElementById('detailModalBody').innerHTML =
+            '<div class="pop-detail-row"><span class="pop-detail-label">작업지시번호</span><span class="pop-detail-value">' + esc(wo.workOrderNo) + '</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">품목명</span><span class="pop-detail-value">' + esc(wo.itemName || wo.itemCode) + '</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">품목코드</span><span class="pop-detail-value">' + esc(wo.itemCode) + '</span></div>'
+          + (wo.processCode ? '<div class="pop-detail-row"><span class="pop-detail-label">공정코드</span><span class="pop-detail-value">' + esc(wo.processCode) + '</span></div>' : '')
+          + (wo.salesOrderNo ? '<div class="pop-detail-row"><span class="pop-detail-label">수주참조</span><span class="pop-detail-value">' + esc(wo.salesOrderNo) + '</span></div>' : '')
+          + '<div class="pop-detail-row"><span class="pop-detail-label">계획수량</span><span class="pop-detail-value">' + fmtNum(wo.plannedQuantity) + ' 개</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">생산수량</span><span class="pop-detail-value">' + fmtNum(wo.producedQuantity) + ' 개</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">시작일</span><span class="pop-detail-value">' + esc(wo.startDate || '') + '</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">완료예정일</span><span class="pop-detail-value">' + esc(wo.plannedEndDate || '') + '</span></div>'
+          + '<div class="pop-detail-row"><span class="pop-detail-label">상태</span><span class="pop-detail-value">' + esc(wo.statusName || wo.status) + '</span></div>'
+          + (wo.note ? '<div class="pop-detail-row"><span class="pop-detail-label">비고</span><span class="pop-detail-value" style="max-width:60%;word-break:break-all;">' + esc(wo.note) + '</span></div>' : '')
+          + '<div style="margin-top:16px;">'
+          +   '<div class="pop-progress-wrap" style="height:16px;">'
+          +     '<div class="pop-progress-bar ' + barCls + '" style="width:' + pct + '%;"></div>'
+          +   '</div>'
+          +   '<div class="pop-progress-text mt-1">진행률: ' + pct + '%</div>'
+          + '</div>';
+
+        // 버튼 구성
+        var footer = document.getElementById('detailModalFooter');
+        footer.innerHTML = '';
+
+        var cancelBtn = '<button type="button" class="pop-action-btn pop-action-btn--cancel" data-bs-dismiss="modal" style="width:auto;min-width:90px;">닫기</button>';
+
+        if (isRel) {
+            footer.innerHTML = cancelBtn
+                + '<button type="button" class="pop-action-btn pop-action-btn--start" style="flex:1;" onclick="doStart()">'
+                + '<i class="bi bi-play-fill"></i>작업 시작</button>';
+        } else if (isInPrg) {
+            footer.innerHTML = cancelBtn
+                + '<button type="button" class="pop-action-btn pop-action-btn--produce" style="flex:1;" onclick="openProduceModal()">'
+                + '<i class="bi bi-calculator"></i>생산수량 입력</button>'
+                + '<button type="button" class="pop-action-btn pop-action-btn--complete" style="flex:1;" onclick="doComplete()">'
+                + '<i class="bi bi-check-circle-fill"></i>작업 완료</button>';
+        } else {
+            footer.innerHTML = cancelBtn;
+        }
+
+        var modal = new bootstrap.Modal(document.getElementById('modalDetail'));
+        modal.show();
+
+    } catch (e) {
+        console.error(e);
+        showPopToast('오류가 발생했습니다: ' + e.message, 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 작업 시작 (Released → InProgress)
+// ══════════════════════════════════════════════════
+async function doStart() {
+    if (!popState.currentWo) return;
+    if (!confirm('"' + popState.currentWo.workOrderNo + '" 작업을 시작하시겠습니까?')) return;
+
+    try {
+        var res = await fetch('/api/workorders/' + encodeURIComponent(popState.currentWo.workOrderNo) + '/status', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'start' })
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalDetail')).hide();
+            showPopToast('작업을 시작했습니다!', 'success');
+            await refreshGrid();
+        } else {
+            var err = await res.json().catch(function() { return {}; });
+            showPopToast('실패: ' + (err.message || '서버 오류'), 'danger');
+        }
+    } catch (e) {
+        showPopToast('네트워크 오류: ' + e.message, 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 작업 완료 (InProgress → Completed)
+// ══════════════════════════════════════════════════
+async function doComplete() {
+    if (!popState.currentWo) return;
+    var wo = popState.currentWo;
+    if (!confirm('"' + wo.workOrderNo + '" 작업을 완료 처리하시겠습니까?\n생산수량: ' + fmtNum(wo.producedQuantity) + '개')) return;
+
+    try {
+        var res = await fetch('/api/workorders/' + encodeURIComponent(wo.workOrderNo) + '/status', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'complete', producedQty: wo.producedQuantity })
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalDetail')).hide();
+            showPopToast('작업이 완료되었습니다!', 'success');
+            await refreshGrid();
+        } else {
+            var err = await res.json().catch(function() { return {}; });
+            showPopToast('실패: ' + (err.message || '서버 오류'), 'danger');
+        }
+    } catch (e) {
+        showPopToast('네트워크 오류: ' + e.message, 'danger');
+    }
+}
+
+// ══════════════════════════════════════════════════
+// 생산수량 입력 모달
+// ══════════════════════════════════════════════════
+function openProduceModal() {
+    // 상세 모달 닫기
+    bootstrap.Modal.getInstance(document.getElementById('modalDetail'))?.hide();
+
+    // 초기화
+    popState.activeField = 'produce';
+    popState.produceVal  = '0';
+    popState.defectVal   = '0';
+    updateNumpadDisplays();
+
+    document.getElementById('produceNote').value = '';
+
+    var modal = new bootstrap.Modal(document.getElementById('modalProduce'));
+    modal.show();
+}
+
+function setActiveField(field) {
+    popState.activeField = field;
+    document.getElementById('displayProduce').classList.toggle('active', field === 'produce');
+    document.getElementById('displayDefect').classList.toggle('active',  field === 'defect');
+    document.getElementById('produceActiveIndicator').style.display = field === 'produce' ? '' : 'none';
+}
+
+function updateNumpadDisplays() {
+    document.getElementById('displayProduce').textContent = fmtNum(parseInt(popState.produceVal, 10) || 0);
+    document.getElementById('displayDefect').textContent  = fmtNum(parseInt(popState.defectVal,  10) || 0);
+}
+
+// 숫자패드 클릭
+document.getElementById('numpad').addEventListener('click', function(e) {
+    var btn = e.target.closest('.numpad-btn');
+    if (!btn) return;
+    var digit = btn.dataset.digit;
+    var field = popState.activeField;
+    var cur   = field === 'produce' ? popState.produceVal : popState.defectVal;
+
+    if (digit === 'BS') {
+        cur = cur.length > 1 ? cur.slice(0, -1) : '0';
+    } else if (digit === 'C') {
+        cur = '0';
+    } else {
+        cur = (cur === '0') ? digit : cur + digit;
+        if (cur.length > 8) cur = cur.slice(0, 8); // 최대 8자리
+    }
+
+    if (field === 'produce') popState.produceVal = cur;
+    else                     popState.defectVal  = cur;
+    updateNumpadDisplays();
+});
+
+// 저장
+async function saveProduce() {
+    if (!popState.currentWo) return;
+
+    var producedQty = parseInt(popState.produceVal, 10) || 0;
+    var defectQty   = parseInt(popState.defectVal,  10) || 0;
+    var note        = document.getElementById('produceNote').value.trim();
+    var wo          = popState.currentWo;
+
+    if (producedQty <= 0) {
+        showPopToast('생산수량을 1 이상 입력하세요.', 'warning');
+        return;
+    }
+    if (defectQty > producedQty) {
+        showPopToast('불량수량이 생산수량보다 클 수 없습니다.', 'warning');
+        return;
+    }
+
+    // 현재 생산수량에 추가 (누적)
+    var newProducedQty = (wo.producedQuantity || 0) + producedQty;
+
+    var btnSave = document.getElementById('btnSaveProduce');
+    try {
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>저장 중...';
+
+        var res = await fetch('/api/workorders/' + encodeURIComponent(wo.workOrderNo) + '/status', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'produce',
+                producedQty: newProducedQty,
+                defectQty: defectQty,
+                note: note || null
+            })
+        });
+
+        if (res.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('modalProduce')).hide();
+            showPopToast('생산수량이 저장되었습니다. (생산: ' + fmtNum(producedQty) + '개, 불량: ' + fmtNum(defectQty) + '개)', 'success');
+            await refreshGrid();
+        } else {
+            var err = await res.json().catch(function() { return {}; });
+            showPopToast('저장 실패: ' + (err.message || '서버 오류'), 'danger');
+        }
+    } catch (e) {
+        showPopToast('저장 실패: ' + e.message, 'danger');
+    } finally {
+        btnSave.disabled = false;
+        btnSave.innerHTML = '<i class="bi bi-check-lg"></i>저장';
+    }
+}
+
+// ══════════════════════════════════════════════════
+// Toast 알림
+// ══════════════════════════════════════════════════
+function showPopToast(msg, type) {
+    type = type || 'info';
+    var iconMap = { success: 'bi-check-circle-fill', danger: 'bi-x-circle-fill', warning: 'bi-exclamation-triangle-fill', info: 'bi-info-circle-fill' };
+    var colorMap = { success: '#3fb950', danger: '#da3633', warning: '#d29922', info: '#388bfd' };
+    var icon  = iconMap[type]  || iconMap.info;
+    var color = colorMap[type] || colorMap.info;
+
+    var id = 'toast-' + Date.now();
+    var html = '<div id="' + id + '" class="toast align-items-center border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true"'
+        + ' style="background:#1c2333;color:#e6edf3;min-width:280px;">'
+        + '<div class="d-flex align-items-center gap-2 p-3">'
+        + '<i class="bi ' + icon + '" style="font-size:1.2rem;color:' + color + ';flex-shrink:0;"></i>'
+        + '<span style="font-size:0.95rem;">' + esc(msg) + '</span>'
+        + '<button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast" aria-label="닫기"></button>'
+        + '</div></div>';
+
+    var container = document.getElementById('popToastContainer');
+    container.insertAdjacentHTML('beforeend', html);
+    var toastEl = document.getElementById(id);
+    var t = new bootstrap.Toast(toastEl, { delay: 4000 });
+    t.show();
+    toastEl.addEventListener('hidden.bs.toast', function() { toastEl.remove(); });
+}
+
+// ══════════════════════════════════════════════════
+// 유틸
+// ══════════════════════════════════════════════════
+function esc(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function fmtNum(n) {
+    if (n == null || isNaN(n)) return '0';
+    return Number(n).toLocaleString('ko-KR');
+}
+
+// ══════════════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', function() {
+    setActiveField('produce');
+    startAutoRefresh();
+});
+</script>
+}

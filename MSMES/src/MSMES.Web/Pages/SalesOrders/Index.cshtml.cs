@@ -1,19 +1,28 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using MSMES.Application.SalesOrder;
+using MSMES.Domain.SalesOrder;
 
 namespace MSMES.Web.Pages.SalesOrders;
 
 [Authorize]
 public class IndexModel : PageModel
 {
-    private readonly ListSalesOrdersHandler _list;
-    public IndexModel(ListSalesOrdersHandler list) => _list = list;
+    private readonly ISalesOrderRepository _repo;
+    public IndexModel(ISalesOrderRepository repo) => _repo = repo;
 
-    public IReadOnlyList<MSMES.Domain.SalesOrder.SalesOrder> Orders { get; private set; } = Array.Empty<MSMES.Domain.SalesOrder.SalesOrder>();
+    public IReadOnlyList<SalesOrder> Orders { get; private set; } = Array.Empty<SalesOrder>();
 
-    public async Task OnGetAsync(CancellationToken ct)
+    public async Task OnGetAsync(
+        string? orderNo,
+        string? customer,
+        string? status,
+        string? dateFrom,
+        string? dateTo,
+        CancellationToken ct)
     {
-        Orders = await _list.HandleAsync(new ListSalesOrdersQuery(0, 50), ct);
+        DateTime? from = dateFrom is not null && DateTime.TryParse(dateFrom, out var fd) ? fd : null;
+        DateTime? to   = dateTo   is not null && DateTime.TryParse(dateTo,   out var td) ? td : null;
+
+        Orders = await _repo.ListFilteredAsync(orderNo, customer, status, from, to, 0, 100, ct);
     }
 }

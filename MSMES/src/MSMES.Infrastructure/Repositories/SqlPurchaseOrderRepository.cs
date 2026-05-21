@@ -85,6 +85,53 @@ public sealed class SqlPurchaseOrderRepository : IPurchaseOrderRepository
         await conn.ExecuteAsync(new CommandDefinition(sql, po, cancellationToken: ct));
     }
 
+    public async Task UpdateWithItemsAsync(Domain.PurchaseOrder.PurchaseOrder po, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+
+        const string sqlHead = @"UPDATE dbo.PurchaseOrders SET
+            SupplierCode=@SupplierCode, SupplierName=@SupplierName,
+            OrderDate=@OrderDate, DueDate=@DueDate, Status=@Status,
+            AssignedTo=@AssignedTo, Note=@Note,
+            UpdatedAt=SYSUTCDATETIME()
+            WHERE PurchaseOrderNo=@PurchaseOrderNo";
+        await conn.ExecuteAsync(new CommandDefinition(sqlHead, po, tx, cancellationToken: ct));
+
+        await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.PurchaseOrderItems WHERE PurchaseOrderNo=@no",
+            new { no = po.PurchaseOrderNo }, tx, cancellationToken: ct));
+
+        const string sqlI = @"INSERT INTO dbo.PurchaseOrderItems
+            (PurchaseOrderNo, ItemNo, ItemCode, ItemName, OrderQuantity, UnitPrice, CreatedAt, CreatedBy)
+            VALUES (@PurchaseOrderNo,@ItemNo,@ItemCode,@ItemName,@OrderQuantity,@UnitPrice,@CreatedAt,@CreatedBy)";
+        int n = 1;
+        foreach (var i in po.Items)
+        {
+            i.PurchaseOrderNo = po.PurchaseOrderNo;
+            i.ItemNo = n++;
+            i.CreatedAt = DateTime.UtcNow;
+            i.CreatedBy = po.CreatedBy;
+            await conn.ExecuteAsync(new CommandDefinition(sqlI, i, tx, cancellationToken: ct));
+        }
+        tx.Commit();
+    }
+
+    public async Task DeleteAsync(string purchaseOrderNo, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        conn.Open();
+        using var tx = conn.BeginTransaction();
+        await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.PurchaseOrderItems WHERE PurchaseOrderNo=@no",
+            new { no = purchaseOrderNo }, tx, cancellationToken: ct));
+        await conn.ExecuteAsync(new CommandDefinition(
+            "DELETE FROM dbo.PurchaseOrders WHERE PurchaseOrderNo=@no",
+            new { no = purchaseOrderNo }, tx, cancellationToken: ct));
+        tx.Commit();
+    }
+
     public Task<string> NextNumberAsync(CancellationToken ct = default) =>
         NumberSequence.NextAsync(_factory, "PO", "PO", ct);
 }

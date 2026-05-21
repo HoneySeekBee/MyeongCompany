@@ -17,8 +17,7 @@
     </div>
     <div class="d-flex gap-2">
         <a href="/api/export/sales-orders" class="btn btn-success btn-sm"><i class="bi bi-file-earmark-excel"></i> Excel</a>
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalSalesOrder"
-                onclick="openCreateModal()" aria-label="수주 등록">
+        <button type="button" class="btn btn-primary" onclick="openCreateModal()" aria-label="수주 등록">
             <i class="bi bi-plus-lg me-1"></i>수주 등록
         </button>
     </div>
@@ -46,6 +45,7 @@
                 <option value="Confirmed"    selected="@(selStatus == "Confirmed"    ? "selected" : null)">확정</option>
                 <option value="InProduction" selected="@(selStatus == "InProduction" ? "selected" : null)">생산중</option>
                 <option value="Shipped"      selected="@(selStatus == "Shipped"      ? "selected" : null)">출하완료</option>
+                <option value="Closed"       selected="@(selStatus == "Closed"       ? "selected" : null)">마감</option>
             </select>
         </div>
         <div class="col-12 col-sm-6 col-md-2 col-lg-2">
@@ -84,11 +84,12 @@
                             <input type="checkbox" class="form-check-input" id="checkAll"
                                    aria-label="전체선택" onclick="toggleAllCheckboxes(this)" />
                         </th>
+                        <th scope="col" style="width:28px;"></th>
                         <th scope="col">수주번호</th>
                         <th scope="col">고객명</th>
                         <th scope="col">수주일</th>
                         <th scope="col">납기일</th>
-                        <th scope="col">금액</th>
+                        <th scope="col" class="text-end">금액</th>
                         <th scope="col">상태</th>
                         <th scope="col" style="width:100px;">액션</th>
                     </tr>
@@ -97,7 +98,7 @@
                 @if (!Model.Orders.Any())
                 {
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted-sm">
+                        <td colspan="9" class="text-center py-4 text-muted-sm">
                             <i class="bi bi-inbox" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4;"></i>
                             수주 데이터가 없습니다.
                         </td>
@@ -113,16 +114,24 @@
                             MSMES.Domain.SalesOrder.SalesOrderStatus.Confirmed    => ("status-badge-confirmed",    "확정"),
                             MSMES.Domain.SalesOrder.SalesOrderStatus.InProduction => ("status-badge-inproduction", "생산중"),
                             MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped      => ("status-badge-shipped",      "출하완료"),
+                            MSMES.Domain.SalesOrder.SalesOrderStatus.Closed       => ("status-badge-secondary",    "마감"),
                             _                                                      => ("status-badge-draft",        s.Status.ToString())
                         };
-                        <tr>
-                            <td>
+                        <tr style="cursor:pointer;"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#so-@s.SalesOrderNo"
+                            aria-expanded="false"
+                            aria-controls="so-@s.SalesOrderNo">
+                            <td onclick="event.stopPropagation()">
                                 <input type="checkbox" class="form-check-input row-check"
                                        value="@s.SalesOrderNo" aria-label="행 선택" />
                             </td>
+                            <td class="text-center text-muted">
+                                <i class="bi bi-chevron-down so-chevron" style="font-size:12px;transition:transform .2s;"></i>
+                            </td>
                             <td>
                                 <a href="#" class="text-primary-ms fw-600"
-                                   onclick="openDetailModal('@s.SalesOrderNo'); return false;">
+                                   onclick="openDetailModal('@s.SalesOrderNo'); event.stopPropagation(); return false;">
                                     @s.SalesOrderNo
                                 </a>
                             </td>
@@ -130,7 +139,9 @@
                             <td>@s.OrderDate.ToString("yyyy-MM-dd")</td>
                             <td>
                                 @{
-                                    var isOverdue = s.DueDate < DateTime.Today && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped;
+                                    var isOverdue = s.DueDate < DateTime.Today &&
+                                                    s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped &&
+                                                    s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Closed;
                                 }
                                 <span class="@(isOverdue ? "text-danger fw-600" : "")">
                                     @s.DueDate.ToString("yyyy-MM-dd")
@@ -140,11 +151,20 @@
                                     }
                                 </span>
                             </td>
-                            <td>—</td>
+                            <td class="text-end">
+                                @if (s.TotalAmount > 0)
+                                {
+                                    <span>@(s.TotalAmount.ToString("N0"))원</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted-sm">—</span>
+                                }
+                            </td>
                             <td>
                                 <span class="ms-badge @statusBadge.Item1">@statusBadge.Item2</span>
                             </td>
-                            <td>
+                            <td onclick="event.stopPropagation()">
                                 <div class="d-flex gap-1">
                                     <button type="button" class="btn-icon"
                                             onclick="openEditModal('@s.SalesOrderNo')"
@@ -156,6 +176,15 @@
                                             aria-label="삭제" title="삭제">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                </div>
+                            </td>
+                        </tr>
+                        <!-- 품목 상세 collapse row (클릭 시 API로 로드) -->
+                        <tr class="collapse" id="so-@s.SalesOrderNo">
+                            <td colspan="9" class="p-0">
+                                <div class="bg-light border-top border-bottom px-4 py-2"
+                                     id="so-items-@s.SalesOrderNo">
+                                    <span class="text-muted-sm"><i class="bi bi-hourglass-split me-1"></i>품목을 불러오는 중...</span>
                                 </div>
                             </td>
                         </tr>
@@ -183,15 +212,15 @@
             </div>
             <form id="formSalesOrder" class="needs-validation" novalidate>
                 <div class="modal-body">
-                    <input type="hidden" id="soId" name="id" />
+                    <!-- 수정 모드일 때 수주번호 저장 -->
+                    <input type="hidden" id="soEditNo" name="editNo" />
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label for="soOrderNo" class="form-label">
                                 수주번호 <span class="text-danger">*</span>
                             </label>
                             <input type="text" id="soOrderNo" name="salesOrderNo"
-                                   class="form-control" placeholder="SO-2026-XXXX" required />
-                            <div class="invalid-feedback">수주번호는 필수 입력입니다.</div>
+                                   class="form-control" placeholder="자동 생성" readonly />
                         </div>
                         <div class="col-md-6">
                             <label for="soCustomer" class="form-label">
@@ -200,6 +229,21 @@
                             <input type="text" id="soCustomer" name="customerName"
                                    class="form-control" placeholder="고객사명" required />
                             <div class="invalid-feedback">고객명은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soCustomerCode" class="form-label">고객코드</label>
+                            <input type="text" id="soCustomerCode" name="customerCode"
+                                   class="form-control" placeholder="CUS-001" />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="soStatus" class="form-label">상태</label>
+                            <select id="soStatus" name="status" class="form-select">
+                                <option value="Draft">초안</option>
+                                <option value="Confirmed">확정</option>
+                                <option value="InProduction">생산중</option>
+                                <option value="Shipped">출하완료</option>
+                                <option value="Closed">마감</option>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label for="soOrderDate" class="form-label">
@@ -216,24 +260,6 @@
                             <input type="date" id="soDueDate" name="dueDate"
                                    class="form-control" required />
                             <div class="invalid-feedback">납기일은 필수 입력입니다.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="soStatus" class="form-label">상태</label>
-                            <select id="soStatus" name="status" class="form-select">
-                                <option value="Draft">초안</option>
-                                <option value="Confirmed">확정</option>
-                                <option value="InProduction">생산중</option>
-                                <option value="Shipped">출하완료</option>
-                                <option value="Cancelled">취소</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="soAmount" class="form-label">수주금액</label>
-                            <div class="input-group">
-                                <span class="input-group-text">₩</span>
-                                <input type="number" id="soAmount" name="amount"
-                                       class="form-control" placeholder="0" min="0" />
-                            </div>
                         </div>
                         <div class="col-12">
                             <label for="soNote" class="form-label">비고</label>
@@ -257,55 +283,142 @@
 
 @section Scripts {
 <script>
-    // 전체 체크박스 토글
+    // ── 체크박스 전체 토글 ──
     function toggleAllCheckboxes(master) {
         document.querySelectorAll('.row-check').forEach(function(cb) {
             cb.checked = master.checked;
         });
     }
 
-    // 등록 모달 열기
-    function openCreateModal() {
+    // ── collapse 토글 시 품목 로드 + 화살표 회전 ──
+    document.addEventListener('show.bs.collapse', function(e) {
+        var collapseId = e.target.id; // "so-SO-2026-0001"
+        var orderNo = collapseId.replace(/^so-/, '');
+        loadItems(orderNo);
+        // 화살표 회전
+        var row = document.querySelector('[data-bs-target="#' + CSS.escape(collapseId) + '"]');
+        if (row) row.querySelector('.so-chevron').style.transform = 'rotate(180deg)';
+    });
+    document.addEventListener('hide.bs.collapse', function(e) {
+        var collapseId = e.target.id;
+        var row = document.querySelector('[data-bs-target="#' + CSS.escape(collapseId) + '"]');
+        if (row) row.querySelector('.so-chevron').style.transform = 'rotate(0deg)';
+    });
+
+    function loadItems(orderNo) {
+        var container = document.getElementById('so-items-' + orderNo);
+        if (!container || container.dataset.loaded === '1') return;
+        container.dataset.loaded = '1';
+
+        msFetch('/api/salesorders/' + encodeURIComponent(orderNo))
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (!data.items || data.items.length === 0) {
+                    container.innerHTML = '<span class="text-muted-sm">등록된 품목이 없습니다.</span>';
+                    return;
+                }
+                var rows = data.items.map(function(i) {
+                    return '<tr>' +
+                        '<td>' + i.itemNo + '</td>' +
+                        '<td>' + escHtml(i.itemCode) + '</td>' +
+                        '<td>' + escHtml(i.itemName) + '</td>' +
+                        '<td class="text-end">' + i.quantity.toLocaleString() + '</td>' +
+                        '<td class="text-end">' + i.unitPrice.toLocaleString() + '원</td>' +
+                        '<td class="text-end fw-600">' + i.amount.toLocaleString() + '원</td>' +
+                        '</tr>';
+                }).join('');
+                container.innerHTML =
+                    '<table class="table table-sm table-bordered mb-0" style="font-size:.85rem;">' +
+                    '<thead class="table-secondary"><tr>' +
+                    '<th style="width:50px;">No</th>' +
+                    '<th>품목코드</th><th>품목명</th>' +
+                    '<th class="text-end">수량</th>' +
+                    '<th class="text-end">단가</th>' +
+                    '<th class="text-end">금액</th>' +
+                    '</tr></thead><tbody>' + rows + '</tbody></table>';
+            })
+            .catch(function() {
+                container.innerHTML = '<span class="text-danger">품목 로드 실패</span>';
+            });
+    }
+
+    function escHtml(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── 등록 모달 열기 ──
+    async function openCreateModal() {
         document.getElementById('modalSalesOrderTitle').textContent = '수주 등록';
         document.getElementById('formSalesOrder').reset();
         document.getElementById('formSalesOrder').classList.remove('was-validated');
+        document.getElementById('soEditNo').value = '';
+        document.getElementById('soOrderNo').value = '번호 생성 중...';
+
         var today = new Date().toISOString().slice(0, 10);
         document.getElementById('soOrderDate').value = today;
+
+        try {
+            var res  = await msFetch('/api/salesorders/next-no');
+            var data = await res.json();
+            document.getElementById('soOrderNo').value = data.number;
+        } catch {
+            document.getElementById('soOrderNo').value = '';
+        }
+
+        new bootstrap.Modal(document.getElementById('modalSalesOrder')).show();
     }
 
-    // 수정 모달 열기
-    function openEditModal(orderNo) {
+    // ── 수정 모달 열기 ──
+    async function openEditModal(orderNo) {
         document.getElementById('modalSalesOrderTitle').textContent = '수주 수정';
+        document.getElementById('formSalesOrder').reset();
         document.getElementById('formSalesOrder').classList.remove('was-validated');
-        document.getElementById('soOrderNo').value = orderNo;
-        var modal = new bootstrap.Modal(document.getElementById('modalSalesOrder'));
-        modal.show();
+
+        try {
+            var res  = await msFetch('/api/salesorders/' + encodeURIComponent(orderNo));
+            var data = await res.json();
+            document.getElementById('soEditNo').value       = data.salesOrderNo;
+            document.getElementById('soOrderNo').value      = data.salesOrderNo;
+            document.getElementById('soCustomer').value     = data.customerName  || '';
+            document.getElementById('soCustomerCode').value = data.customerCode  || '';
+            document.getElementById('soOrderDate').value    = (data.orderDate    || '').slice(0,10);
+            document.getElementById('soDueDate').value      = (data.dueDate      || '').slice(0,10);
+            document.getElementById('soNote').value         = data.note          || '';
+            document.getElementById('soStatus').value       = data.status        || 'Draft';
+        } catch {
+            showToast('수주 정보를 불러오지 못했습니다.', 'danger');
+            return;
+        }
+
+        new bootstrap.Modal(document.getElementById('modalSalesOrder')).show();
     }
 
-    // 상세보기
+    // ── 상세보기 (수정 모달과 동일) ──
     function openDetailModal(orderNo) {
         openEditModal(orderNo);
     }
 
-    // 삭제 확인
+    // ── 삭제 확인 ──
     function confirmDeleteOrder(orderNo) {
-        if (confirm('"' + orderNo + '" 수주를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
-            msFetch('/api/salesorders/' + orderNo, { method: 'DELETE' })
-                .then(function(res) {
-                    if (res.ok) {
-                        showToast('수주가 삭제되었습니다.', 'success');
-                        setTimeout(function() { location.reload(); }, 1000);
-                    } else {
-                        showToast('삭제 실패: 서버 오류', 'danger');
-                    }
-                })
-                .catch(function() {
-                    showToast('삭제 실패: 네트워크 오류', 'danger');
-                });
-        }
+        if (!confirm('"' + orderNo + '" 수주를 삭제하시겠습니까?\n초안(Draft) 상태만 삭제 가능합니다.')) return;
+
+        msFetch('/api/salesorders/' + encodeURIComponent(orderNo), { method: 'DELETE' })
+            .then(function(res) {
+                if (res.ok) {
+                    showToast('수주가 삭제되었습니다.', 'success');
+                    setTimeout(function() { location.reload(); }, 1000);
+                } else {
+                    return res.json().then(function(err) {
+                        showToast('삭제 실패: ' + (err.message || '서버 오류'), 'danger');
+                    });
+                }
+            })
+            .catch(function() {
+                showToast('삭제 실패: 네트워크 오류', 'danger');
+            });
     }
 
-    // 폼 저장
+    // ── 폼 저장 ──
     document.getElementById('formSalesOrder').addEventListener('submit', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -315,14 +428,26 @@
             if (firstInvalid) firstInvalid.focus();
             return;
         }
-        var data = Object.fromEntries(new FormData(this).entries());
-        var isEdit = !!data.id;
-        var url    = isEdit ? '/api/salesorders/' + data.id : '/api/salesorders';
+
+        var editNo = document.getElementById('soEditNo').value;
+        var isEdit = !!editNo;
+        var url    = isEdit ? '/api/salesorders/' + encodeURIComponent(editNo) : '/api/salesorders';
         var method = isEdit ? 'PUT' : 'POST';
 
-        msFetch(url, { method: method, body: JSON.stringify(data) })
+        var payload = {
+            salesOrderNo : document.getElementById('soOrderNo').value,
+            customerCode : document.getElementById('soCustomerCode').value,
+            customerName : document.getElementById('soCustomer').value,
+            orderDate    : document.getElementById('soOrderDate').value,
+            dueDate      : document.getElementById('soDueDate').value,
+            status       : document.getElementById('soStatus').value,
+            note         : document.getElementById('soNote').value,
+            items        : []
+        };
+
+        msFetch(url, { method: method, body: JSON.stringify(payload) })
             .then(function(res) {
-                if (res.ok) {
+                if (res.ok || res.status === 201 || res.status === 204) {
                     bootstrap.Modal.getInstance(document.getElementById('modalSalesOrder')).hide();
                     showToast('수주가 ' + (isEdit ? '수정' : '등록') + '되었습니다.', 'success');
                     setTimeout(function() { location.reload(); }, 1200);

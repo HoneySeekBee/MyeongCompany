@@ -162,7 +162,7 @@
                                     <th style="text-align:center;">품목수</th>
                                     <th style="text-align:right;">총금액</th>
                                     <th style="text-align:center;">상태</th>
-                                    <th style="width:130px;text-align:center;">액션</th>
+                                    <th style="width:180px;text-align:center;">액션</th>
                                 </tr>
                             </thead>
                             <tbody id="poTbody">
@@ -421,6 +421,115 @@
 
 
 <!-- ══════════════════════════════════════════
+     발주 수정 모달
+══════════════════════════════════════════ -->
+<div class="modal fade" id="poEditModal" tabindex="-1" aria-labelledby="poEditModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="poEditModalLabel">
+                    <i class="bi bi-pencil-square me-2"></i>발주 수정 –
+                    <span id="editPoNoDisplay" class="text-primary-ms fw-700"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editPoNo">
+
+                <!-- 헤더 정보 -->
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-3">
+                        <label class="form-label fw-600" for="editSupplierCode">공급업체코드 <span class="text-danger">*</span></label>
+                        <input type="text" id="editSupplierCode" class="form-control" placeholder="SUP-001" required>
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label fw-600" for="editSupplierName">공급업체명 <span class="text-danger">*</span></label>
+                        <input type="text" id="editSupplierName" class="form-control" placeholder="공급업체 이름" required>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-600" for="editOrderDate">발주일</label>
+                        <input type="date" id="editOrderDate" class="form-control">
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-600" for="editDueDate">납기일 <span class="text-danger">*</span></label>
+                        <input type="date" id="editDueDate" class="form-control" required>
+                    </div>
+                    <div class="col-12 col-md-2">
+                        <label class="form-label fw-600" for="editAssignedTo">담당자</label>
+                        <input type="text" id="editAssignedTo" class="form-control" placeholder="담당자">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-600" for="editNote">비고</label>
+                        <textarea id="editNote" class="form-control" rows="2" placeholder="특이사항을 입력하세요"></textarea>
+                    </div>
+                </div>
+
+                <!-- 품목 입력 행 -->
+                <div class="row g-2 mb-2 align-items-end">
+                    <div class="col-12 col-md-2">
+                        <label class="form-label mb-1 small fw-600">품목코드</label>
+                        <input type="text" id="editItemCode" class="form-control form-control-sm" placeholder="ITEM-001">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label mb-1 small fw-600">품목명</label>
+                        <input type="text" id="editItemName" class="form-control form-control-sm" placeholder="품목명">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1 small fw-600">발주수량</label>
+                        <input type="number" id="editItemQty" class="form-control form-control-sm" placeholder="0" min="1">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1 small fw-600">단가 (₩)</label>
+                        <input type="number" id="editItemUnitPrice" class="form-control form-control-sm" placeholder="0" min="0">
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <label class="form-label mb-1 small fw-600">금액</label>
+                        <input type="text" id="editItemAmount" class="form-control form-control-sm" readonly placeholder="자동계산">
+                    </div>
+                    <div class="col-6 col-md-1">
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100" id="btnEditAddItem">
+                            <i class="bi bi-plus-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 품목 목록 테이블 -->
+                <div class="mes-table-wrapper" style="max-height:280px;overflow-y:auto;">
+                    <table class="mes-table">
+                        <thead>
+                            <tr>
+                                <th>품목코드</th>
+                                <th>품목명</th>
+                                <th style="text-align:right;">발주수량</th>
+                                <th style="text-align:right;">단가</th>
+                                <th style="text-align:right;">금액</th>
+                                <th style="width:40px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="editItemsTbody">
+                            <tr id="trEditNoItems">
+                                <td colspan="6" class="text-center text-muted py-3">추가된 품목이 없습니다.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end mt-2 pe-1">
+                    <strong>총 발주금액: <span id="editTotalAmount" class="text-primary-ms">₩ 0</span></strong>
+                </div>
+                <div id="editItemsError" class="text-danger small mt-1" style="display:none;">최소 1개 이상의 품목을 추가하세요.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnEditPoSave" data-save>
+                    <i class="bi bi-check-lg me-1"></i>저장
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════
      발주 등록 모달 (2단계)
 ══════════════════════════════════════════ -->
 <div class="modal fade" id="poRegisterModal" tabindex="-1" aria-labelledby="poRegisterModalLabel" aria-hidden="true">
@@ -554,6 +663,9 @@
 (function () {
     'use strict';
 
+    /* ── API Base URL ─────────────────────────────────── */
+    var API = '/api/purchaseorders';
+
     /* ── 서버 초기 데이터 ─────────────────────────────── */
     var statusLabels = ['초안(Draft)', '발행(Issued)', '입고완료(Received)'];
     var statusData   = [@Model.StatusDraft, @Model.StatusIssued, @Model.StatusReceived];
@@ -602,7 +714,8 @@
             'Issued':            ['primary',    '발행'],
             'PartiallyReceived': ['warning',    '부분입고'],
             'Received':          ['success',    '입고완료'],
-            'Closed':            ['dark',       '마감']
+            'Closed':            ['dark',       '마감'],
+            'Cancelled':         ['danger',     '취소']
         };
         var info = map[status] || ['secondary', status];
         return '<span class="ms-badge bg-' + info[0] + ' text-white">' + info[1] + '</span>';
@@ -633,7 +746,33 @@
                 ? '<i class="bi bi-exclamation-triangle-fill text-danger ms-1" title="납기 임박/초과"></i>'
                 : '';
             var dueDateCls = (dueSoon || overdue) ? ' style="color:#dc3545;font-weight:600;"' : '';
-            var totalAmt = po.totalAmount ? po.totalAmount.toLocaleString('ko-KR') : '0';
+            var totalAmt   = po.totalAmount ? po.totalAmount.toLocaleString('ko-KR') : '0';
+            var noEsc      = encodeURIComponent(po.purchaseOrderNo);
+
+            /* 상태별 빠른 액션 버튼 */
+            var quickBtn = '';
+            if (po.status === 'Draft') {
+                quickBtn = '<button class="btn btn-outline-success btn-sm py-0 px-1 me-1" ' +
+                    'onclick="issuePoQuick(\'' + po.purchaseOrderNo + '\')" title="발행">' +
+                    '<i class="bi bi-send"></i> 발행</button>';
+            } else if (po.status === 'Issued') {
+                quickBtn = '<a href="/Receiving" class="btn btn-outline-info btn-sm py-0 px-1 me-1" title="입고처리">' +
+                    '<i class="bi bi-box-arrow-in-down"></i> 입고</a>';
+            }
+
+            /* 수정/삭제 버튼 (Draft, Issued만) */
+            var editBtn = '';
+            var delBtn  = '';
+            if (po.status === 'Draft' || po.status === 'Issued') {
+                editBtn = '<button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1" ' +
+                    'onclick="openPoEdit(\'' + po.purchaseOrderNo + '\')" title="수정">' +
+                    '<i class="bi bi-pencil"></i></button>';
+            }
+            if (po.status === 'Draft') {
+                delBtn = '<button class="btn btn-outline-danger btn-sm py-0 px-1" ' +
+                    'onclick="deletePo(\'' + po.purchaseOrderNo + '\')" title="삭제">' +
+                    '<i class="bi bi-trash3"></i></button>';
+            }
 
             html += '<tr ' + dueCls + '>' +
                 '<td onclick="event.stopPropagation();"><input type="checkbox" class="form-check-input rowPoChk" value="' + po.purchaseOrderNo + '"></td>' +
@@ -645,9 +784,9 @@
                 '<td style="text-align:center;">' + (po.itemCount || 0) + '</td>' +
                 '<td style="text-align:right;">₩ ' + totalAmt + '</td>' +
                 '<td style="text-align:center;">' + poBadge(po.status) + '</td>' +
-                '<td style="text-align:center;" onclick="event.stopPropagation();">' +
-                    '<button class="btn btn-outline-primary btn-sm py-0 px-2 me-1" onclick="openPoDetail(\'' + po.purchaseOrderNo + '\')" title="상세">상세</button>' +
-                    '<button class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="openPoStatusModal(\'' + po.purchaseOrderNo + '\',\'' + po.status + '\')" title="상태변경">상태</button>' +
+                '<td style="text-align:center;white-space:nowrap;" onclick="event.stopPropagation();">' +
+                    '<button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="openPoDetail(\'' + po.purchaseOrderNo + '\')" title="상세"><i class="bi bi-eye"></i></button>' +
+                    quickBtn + editBtn + delBtn +
                 '</td>' +
             '</tr>';
         });
@@ -656,7 +795,7 @@
 
     /* ── AJAX: 발주 목록 로드 ────────────────────────── */
     function loadPos() {
-        msFetch('/api/purchase-orders')
+        msFetch(API)
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 allPos = data;
@@ -722,7 +861,7 @@
         var oc = new bootstrap.Offcanvas(document.getElementById('poDetailOffcanvas'));
         oc.show();
 
-        msFetch('/api/purchase-orders/' + encodeURIComponent(poNo))
+        msFetch(API + '/' + encodeURIComponent(poNo))
             .then(function (r) { return r.json(); })
             .then(function (po) {
                 document.getElementById('detailPoStatusBadge').innerHTML = poBadge(po.status);
@@ -760,6 +899,38 @@
             });
     };
 
+    /* ── 발행 빠른 처리 ──────────────────────────────── */
+    window.issuePoQuick = function (poNo) {
+        if (!confirm(poNo + ' 발주를 발행하시겠습니까?')) return;
+        msFetch(API + '/' + encodeURIComponent(poNo) + '/status', {
+            method: 'PATCH',
+            body: JSON.stringify({ status: 'Issued' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            if (res.success === false) { showToast(res.message || '발행 실패', 'danger'); return; }
+            showToast(poNo + ' 발행 처리되었습니다.', 'success');
+            loadPos();
+        })
+        .catch(function () { showToast('발행 처리 중 오류가 발생했습니다.', 'danger'); });
+    };
+
+    /* ── 발주 삭제 ───────────────────────────────────── */
+    window.deletePo = function (poNo) {
+        if (!confirm(poNo + ' 발주를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return;
+        msFetch(API + '/' + encodeURIComponent(poNo), { method: 'DELETE' })
+        .then(function (r) {
+            if (r.status === 400) return r.json().then(function (d) { throw new Error(d.message || '삭제 불가'); });
+            return r.json();
+        })
+        .then(function (res) {
+            if (res.success === false) { showToast(res.message || '삭제 실패', 'danger'); return; }
+            showToast(poNo + ' 삭제되었습니다.', 'success');
+            loadPos();
+        })
+        .catch(function (err) { showToast(err.message || '삭제 중 오류가 발생했습니다.', 'danger'); });
+    };
+
     /* ── 상태 변경 모달 ──────────────────────────────── */
     window.openPoStatusModal = function (poNo, currentStatus) {
         document.getElementById('statusModalPoNo').value = poNo;
@@ -772,7 +943,7 @@
     document.getElementById('btnSavePoStatus').addEventListener('click', function () {
         var no = document.getElementById('statusModalPoNo').value;
         var st = document.getElementById('newPoStatusSelect').value;
-        msFetch('/api/purchase-orders/' + encodeURIComponent(no) + '/status', {
+        msFetch(API + '/' + encodeURIComponent(no) + '/status', {
             method: 'PATCH',
             body: JSON.stringify({ status: st })
         })
@@ -789,7 +960,155 @@
         .catch(function () { showToast('상태 변경 중 오류가 발생했습니다.', 'danger'); });
     });
 
-    /* ── 발주 등록 모달 ──────────────────────────────── */
+    /* ════════════════════════════════════════════════════
+       발주 수정 모달
+    ════════════════════════════════════════════════════ */
+    var editItems = [];
+
+    function calcEditTotal() {
+        var total = editItems.reduce(function (s, i) { return s + i.orderQuantity * i.unitPrice; }, 0);
+        document.getElementById('editTotalAmount').textContent = '₩ ' + total.toLocaleString('ko-KR');
+    }
+
+    function renderEditItems() {
+        var tbody = document.getElementById('editItemsTbody');
+        if (editItems.length === 0) {
+            tbody.innerHTML = '<tr id="trEditNoItems"><td colspan="6" class="text-center text-muted py-3">추가된 품목이 없습니다.</td></tr>';
+            calcEditTotal();
+            return;
+        }
+        var html = '';
+        editItems.forEach(function (item, idx) {
+            var amt = item.orderQuantity * item.unitPrice;
+            html += '<tr>' +
+                '<td>' + item.itemCode + '</td>' +
+                '<td>' + item.itemName + '</td>' +
+                '<td style="text-align:right;">' + item.orderQuantity.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:right;">₩ ' + item.unitPrice.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:right;">₩ ' + amt.toLocaleString('ko-KR') + '</td>' +
+                '<td style="text-align:center;">' +
+                    '<button type="button" class="btn-icon btn-icon-danger" onclick="removeEditItem(' + idx + ')"><i class="bi bi-trash3"></i></button>' +
+                '</td></tr>';
+        });
+        tbody.innerHTML = html;
+        calcEditTotal();
+    }
+
+    window.removeEditItem = function (idx) {
+        editItems.splice(idx, 1);
+        renderEditItems();
+    };
+
+    /* 금액 자동계산 (수정 모달) */
+    ['editItemQty', 'editItemUnitPrice'].forEach(function (id) {
+        document.getElementById(id).addEventListener('input', function () {
+            var qty   = parseFloat(document.getElementById('editItemQty').value) || 0;
+            var price = parseFloat(document.getElementById('editItemUnitPrice').value) || 0;
+            document.getElementById('editItemAmount').value = '₩ ' + (qty * price).toLocaleString('ko-KR');
+        });
+    });
+
+    document.getElementById('btnEditAddItem').addEventListener('click', function () {
+        var code  = document.getElementById('editItemCode').value.trim();
+        var name  = document.getElementById('editItemName').value.trim();
+        var qty   = parseFloat(document.getElementById('editItemQty').value);
+        var price = parseFloat(document.getElementById('editItemUnitPrice').value) || 0;
+
+        if (!code)              { showToast('품목코드를 입력하세요.', 'warning'); return; }
+        if (!name)              { showToast('품목명을 입력하세요.', 'warning'); return; }
+        if (!qty || qty <= 0)   { showToast('발주수량을 올바르게 입력하세요.', 'warning'); return; }
+        if (price < 0)          { showToast('단가를 올바르게 입력하세요.', 'warning'); return; }
+
+        editItems.push({ itemCode: code, itemName: name, orderQuantity: qty, unitPrice: price });
+        renderEditItems();
+        document.getElementById('editItemCode').value = '';
+        document.getElementById('editItemName').value = '';
+        document.getElementById('editItemQty').value = '';
+        document.getElementById('editItemUnitPrice').value = '';
+        document.getElementById('editItemAmount').value = '';
+        document.getElementById('editItemsError').style.display = 'none';
+    });
+
+    window.openPoEdit = function (poNo) {
+        /* 기존 데이터 불러오기 */
+        msFetch(API + '/' + encodeURIComponent(poNo))
+            .then(function (r) { return r.json(); })
+            .then(function (po) {
+                document.getElementById('editPoNo').value = po.purchaseOrderNo;
+                document.getElementById('editPoNoDisplay').textContent = po.purchaseOrderNo;
+                document.getElementById('editSupplierCode').value = po.supplierCode || '';
+                document.getElementById('editSupplierName').value = po.supplierName || '';
+                document.getElementById('editOrderDate').value    = po.orderDate ? po.orderDate.substring(0,10) : '';
+                document.getElementById('editDueDate').value      = po.dueDate   ? po.dueDate.substring(0,10)   : '';
+                document.getElementById('editAssignedTo').value   = po.assignedTo || '';
+                document.getElementById('editNote').value         = po.note || '';
+                document.getElementById('editItemsError').style.display = 'none';
+
+                editItems = (po.items || []).map(function (i) {
+                    return { itemCode: i.itemCode, itemName: i.itemName,
+                             orderQuantity: i.orderQuantity, unitPrice: i.unitPrice };
+                });
+                renderEditItems();
+
+                var m = new bootstrap.Modal(document.getElementById('poEditModal'));
+                m.show();
+            })
+            .catch(function () { showToast('발주 데이터를 불러오는 데 실패했습니다.', 'danger'); });
+    };
+
+    document.getElementById('btnEditPoSave').addEventListener('click', function () {
+        var no = document.getElementById('editPoNo').value;
+        if (!document.getElementById('editSupplierCode').value.trim()) {
+            showToast('공급업체코드를 입력하세요.', 'warning'); return;
+        }
+        if (!document.getElementById('editSupplierName').value.trim()) {
+            showToast('공급업체명을 입력하세요.', 'warning'); return;
+        }
+        if (!document.getElementById('editDueDate').value) {
+            showToast('납기일을 선택하세요.', 'warning'); return;
+        }
+        if (editItems.length === 0) {
+            document.getElementById('editItemsError').style.display = '';
+            return;
+        }
+
+        var payload = {
+            supplierCode: document.getElementById('editSupplierCode').value.trim(),
+            supplierName: document.getElementById('editSupplierName').value.trim(),
+            orderDate:    document.getElementById('editOrderDate').value || null,
+            dueDate:      document.getElementById('editDueDate').value,
+            assignedTo:   document.getElementById('editAssignedTo').value.trim() || null,
+            note:         document.getElementById('editNote').value.trim() || null,
+            items: editItems
+        };
+
+        var btn = document.getElementById('btnEditPoSave');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch(API + '/' + encodeURIComponent(no), { method: 'PUT', body: JSON.stringify(payload) })
+            .then(function (r) {
+                if (r.status === 400) return r.json().then(function (d) { throw new Error(d.message || '수정 실패'); });
+                return r.json();
+            })
+            .then(function (res) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                if (res.success === false) { showToast(res.message || '수정 실패', 'danger'); return; }
+                bootstrap.Modal.getInstance(document.getElementById('poEditModal')).hide();
+                showToast(no + ' 발주가 수정되었습니다.', 'success');
+                loadPos();
+            })
+            .catch(function (err) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>저장';
+                showToast(err.message || '수정 중 오류가 발생했습니다.', 'danger');
+            });
+    });
+
+    /* ════════════════════════════════════════════════════
+       발주 등록 모달 (2단계)
+    ════════════════════════════════════════════════════ */
     var poRegStep  = 1;
     var poRegItems = [];
 
@@ -851,7 +1170,7 @@
         renderPoRegItems();
     };
 
-    /* 금액 자동계산 */
+    /* 금액 자동계산 (등록 모달) */
     ['regItemQty', 'regItemUnitPrice'].forEach(function (id) {
         document.getElementById(id).addEventListener('input', function () {
             var qty   = parseFloat(document.getElementById('regItemQty').value) || 0;
@@ -934,7 +1253,7 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
 
-        msFetch('/api/purchase-orders', { method: 'POST', body: JSON.stringify(payload) })
+        msFetch(API, { method: 'POST', body: JSON.stringify(payload) })
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 btn.disabled = false;
