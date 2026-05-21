@@ -10,4 +10,6 @@ public interface ILotRepository
     Task UpdateAsync(Lot lot, CancellationToken ct = default);
     Task AddHistoryAsync(LotHistory history, CancellationToken ct = default);
     Task<string> NextNumberAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<LotMaterial>>  GetLotMaterialsAsync(string lotNo, CancellationToken ct = default);
+    Task<IReadOnlyList<string>>       FindLotsByMaterialAsync(string materialCode, CancellationToken ct = default);
 }

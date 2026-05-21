@@ -88,6 +88,13 @@
                 <hr class="ms-sidebar__divider" />
                 <div class="ms-sidebar__group-label">영업 / 구매</div>
 
+                @if (isAdmin || isManager || isSales || isPurchase)
+                {
+                    <a href="/Partners" class="ms-sidebar__link" aria-label="거래처 관리">
+                        <i class="bi bi-building"></i>
+                        <span class="ms-sidebar__link-text">거래처 관리</span>
+                    </a>
+                }
                 @if (isAdmin || isManager || isSales)
                 {
                     <a href="/SalesOrders" class="ms-sidebar__link" aria-label="수주관리">
@@ -125,6 +132,10 @@
                     <a href="/Lots" class="ms-sidebar__link" aria-label="LOT관리">
                         <i class="bi bi-tags"></i>
                         <span class="ms-sidebar__link-text">LOT관리</span>
+                    </a>
+                    <a href="/Lots/Trace" class="ms-sidebar__link" aria-label="LOT 역추적">
+                        <i class="bi bi-diagram-2"></i>
+                        <span class="ms-sidebar__link-text">LOT 역추적</span>
                     </a>
                 }
                 @if (isAdmin || isManager || isWorker)
@@ -181,6 +192,10 @@
                     <a href="/Quality" class="ms-sidebar__link" aria-label="품질관리">
                         <i class="bi bi-patch-check"></i>
                         <span class="ms-sidebar__link-text">품질관리</span>
+                    </a>
+                    <a href="/Quality/Spc" class="ms-sidebar__link" aria-label="SPC 관리도">
+                        <i class="bi bi-graph-up me-2"></i>
+                        <span class="ms-sidebar__link-text">SPC 관리도</span>
                     </a>
                 }
                 @if (isAdmin || isManager)

@@ -1,0 +1,118 @@
+@page
+@model MSMES.Web.Pages.Partners.IndexModel
+@{ ViewData["Title"] = "거래처 관리"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">거래처 관리</h1>
+    <div class="d-flex gap-2">
+        <input type="text" id="partnerSearch" class="form-control form-control-sm" placeholder="거래처명 검색..." style="width:200px;">
+        <select id="typeFilter" class="form-select form-select-sm" style="width:120px;">
+            <option value="">전체</option>
+            <option value="CUSTOMER">고객사</option>
+            <option value="SUPPLIER">공급업체</option>
+            <option value="BOTH">고객/공급</option>
+        </select>
+    </div>
+</div>
+
+<!-- KPI -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">전체 거래처</div>
+            <div class="h3 fw-bold mb-0">@Model.Partners.Count</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">고객사</div>
+            <div class="h3 fw-bold mb-0 text-primary">@Model.CustomerCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">공급업체</div>
+            <div class="h3 fw-bold mb-0 text-success">@Model.SupplierCount</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">겸업</div>
+            <div class="h3 fw-bold mb-0 text-info">@Model.BothCount</div>
+        </div>
+    </div>
+</div>
+
+<!-- Partners table -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0" id="partnersTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>코드</th><th>거래처명</th><th>구분</th><th>사업자번호</th>
+                    <th>대표자</th><th>담당자</th><th>연락처</th><th>결제조건</th>
+                    <th>등급</th><th>상태</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var p in Model.Partners)
+            {
+                <tr data-name="@p.PartnerName.ToLower()" data-type="@p.PartnerType"
+                    data-bs-toggle="collapse" data-bs-target="#p-@p.Id" style="cursor:pointer;">
+                    <td class="small text-muted">@p.PartnerCode</td>
+                    <td class="fw-semibold">@p.PartnerName</td>
+                    <td><span class="badge bg-@p.TypeCss">@p.TypeName</span></td>
+                    <td class="small">@p.BusinessNo</td>
+                    <td>@p.RepName</td>
+                    <td>@p.ContactName</td>
+                    <td class="small">@p.Tel</td>
+                    <td class="small">@p.PaymentTerms</td>
+                    <td class="text-warning" style="letter-spacing:2px;">@p.RatingStars</td>
+                    <td>
+                        @if (p.IsActive) { <span class="badge bg-success">활성</span> }
+                        else { <span class="badge bg-secondary">비활성</span> }
+                    </td>
+                </tr>
+                <tr class="collapse" id="p-@p.Id">
+                    <td colspan="10" class="bg-light p-3">
+                        <div class="row g-2 small">
+                            <div class="col-md-4">
+                                <span class="text-muted">이메일:</span> @(p.Email ?? "-")<br/>
+                                <span class="text-muted">주소:</span> @(p.Address ?? "-")
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted">신용한도:</span>
+                                @(p.CreditLimit.HasValue ? "₩" + p.CreditLimit.Value.ToString("N0") : "-")<br/>
+                                <span class="text-muted">담당자 연락처:</span> @(p.ContactTel ?? "-")
+                            </div>
+                            <div class="col-md-4">
+                                <span class="text-muted">메모:</span> @(p.Memo ?? "-")
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+            @if (!Model.Partners.Any())
+            {
+                <tr><td colspan="10" class="text-center text-muted py-5">거래처가 없습니다.</td></tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const searchInput = document.getElementById('partnerSearch');
+const typeFilter  = document.getElementById('typeFilter');
+function filterTable() {
+    const q = searchInput.value.toLowerCase();
+    const t = typeFilter.value;
+    document.querySelectorAll('#partnersTable tbody tr[data-name]').forEach(row => {
+        const nameMatch = !q || row.dataset.name.includes(q);
+        const typeMatch = !t || row.dataset.type === t;
+        row.style.display = nameMatch && typeMatch ? '' : 'none';
+    });
+}
+searchInput.addEventListener('input', filterTable);
+typeFilter.addEventListener('change', filterTable);
+</script>

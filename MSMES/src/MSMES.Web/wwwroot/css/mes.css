@@ -530,8 +530,8 @@ html, body {
     .ms-main    { margin-left: var(--sidebar-width); }
 }
 
-/* 768px ~ 1199px: 사이드바 아이콘만 */
-@media (min-width: 768px) and (max-width: 1199px) {
+/* 992px ~ 1199px: 사이드바 아이콘만 */
+@media (min-width: 992px) and (max-width: 1199px) {
     .ms-sidebar {
         width: var(--sidebar-collapsed-width);
     }
@@ -562,8 +562,8 @@ html, body {
     }
 }
 
-/* 768px 미만: 사이드바 오프캔버스 */
-@media (max-width: 767.98px) {
+/* 991.98px 미만: 사이드바 오프캔버스 */
+@media (max-width: 991.98px) {
     .ms-sidebar {
         transform: translateX(-100%);
         width: var(--sidebar-width);
@@ -591,9 +591,45 @@ html, body {
     }
 }
 
+/* 767.98px 미만: 추가 모바일 최적화 */
+@media (max-width: 767.98px) {
+    /* 반응형 스택 테이블 */
+    .table-responsive-stack th { display: none; }
+    .table-responsive-stack td {
+        display: flex;
+        padding: 4px 8px;
+        border-bottom: none;
+    }
+    .table-responsive-stack td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        min-width: 120px;
+        color: #888;
+    }
+    .table-responsive-stack tr {
+        display: block;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        padding: 4px 0;
+    }
+
+    /* KPI 그리드: 모바일에서 2열 */
+    .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+    /* 차트 행: 세로 방향으로 쌓기 */
+    .charts-row { grid-template-columns: 1fr !important; }
+
+    /* 버튼: 터치 영역 최소 44px */
+    .btn { min-height: 44px; padding: .5rem .75rem; }
+}
+
 .ms-overlay {
     display: none;
 }
+
+/* ── 터치 친화적 버튼 최소 높이 ──────────────────────── */
+.btn { min-height: 38px; }
 
 /* ── 유틸리티 ──────────────────────────────────────────── */
 .text-primary-ms { color: var(--ms-primary) !important; }

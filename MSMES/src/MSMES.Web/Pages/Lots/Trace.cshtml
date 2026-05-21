@@ -1,0 +1,156 @@
+@page
+@model MSMES.Web.Pages.Lots.TraceModel
+@{ ViewData["Title"] = "LOT 역추적"; }
+
+<h1 class="h3 mb-4">LOT 트레이서빌리티 (역추적)</h1>
+
+<!-- Search area -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <form method="get">
+                    <label class="form-label fw-semibold"><i class="bi bi-arrow-down-circle text-primary me-1"></i>순방향 추적 — LOT 번호로 사용 자재 조회</label>
+                    <div class="input-group">
+                        <input type="hidden" name="SearchMaterialCode" value="" />
+                        <input type="text" name="SearchLotNo" class="form-control" placeholder="LOT 번호 입력 (예: LOT-2025-001)"
+                               value="@Model.SearchLotNo" />
+                        <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i> 조회</button>
+                    </div>
+                </form>
+            </div>
+            <div class="col-md-6">
+                <form method="get">
+                    <label class="form-label fw-semibold"><i class="bi bi-arrow-up-circle text-warning me-1"></i>역방향 추적 — 자재 코드로 사용된 LOT 조회</label>
+                    <div class="input-group">
+                        <input type="hidden" name="SearchLotNo" value="" />
+                        <input type="text" name="SearchMaterialCode" class="form-control" placeholder="자재 코드 입력 (예: M-0011)"
+                               value="@Model.SearchMaterialCode" />
+                        <button class="btn btn-warning" type="submit"><i class="bi bi-search"></i> 역추적</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Forward trace result -->
+@if (Model.FoundLot is not null)
+{
+    <div class="row g-4">
+        <!-- LOT info -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-primary text-white">
+                    <i class="bi bi-box-seam me-1"></i> LOT 정보
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tr><th class="text-muted" style="width:40%">LOT번호</th><td class="fw-bold">@Model.FoundLot.LotNo</td></tr>
+                        <tr><th class="text-muted">품목코드</th><td>@Model.FoundLot.ItemCode</td></tr>
+                        <tr><th class="text-muted">품목명</th><td>@Model.FoundLot.ItemName</td></tr>
+                        <tr><th class="text-muted">상태</th>
+                            <td><span class="badge bg-primary">@Model.FoundLot.Status</span></td></tr>
+                        <tr><th class="text-muted">생산수량</th><td>@Model.FoundLot.ProducedQuantity</td></tr>
+                        <tr><th class="text-muted">불량수량</th><td>@Model.FoundLot.DefectQuantity</td></tr>
+                        <tr><th class="text-muted">생산일</th><td>@Model.FoundLot.ProductionDate.ToString("yyyy/MM/dd")</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Used materials -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-layers me-1"></i> 투입 자재 (@(Model.Materials.Count)종)
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.Materials.Any())
+                    {
+                        <table class="table table-sm mb-0">
+                            <thead class="table-light">
+                                <tr><th>자재코드</th><th>자재명</th><th>수량</th><th>입고번호</th></tr>
+                            </thead>
+                            <tbody>
+                            @foreach (var m in Model.Materials)
+                            {
+                                <tr>
+                                    <td class="small">@m.MaterialCode</td>
+                                    <td>@m.MaterialName</td>
+                                    <td>@m.Quantity @m.Unit</td>
+                                    <td class="small text-muted">@(m.ReceiptNo ?? "-")</td>
+                                </tr>
+                            }
+                            </tbody>
+                        </table>
+                    }
+                    else
+                    {
+                        <div class="text-center text-muted p-4">자재 정보 없음</div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- LOT history -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-info text-white">
+                    <i class="bi bi-clock-history me-1"></i> 이력 (@(Model.LotHistories.Count)건)
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                    @foreach (var h in Model.LotHistories)
+                    {
+                        <div class="list-group-item px-3 py-2">
+                            <div class="d-flex justify-content-between">
+                                <span class="small fw-semibold">@h.Operation</span>
+                                <span class="small text-muted">@h.OperatedAt.ToString("MM/dd HH:mm")</span>
+                            </div>
+                            <div class="small text-muted">@h.Operator</div>
+                            @if (!string.IsNullOrEmpty(h.Remarks))
+                            {
+                                <div class="small text-secondary">@h.Remarks</div>
+                            }
+                        </div>
+                    }
+                    @if (!Model.LotHistories.Any())
+                    {
+                        <div class="list-group-item text-center text-muted">이력 없음</div>
+                    }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Reverse trace result -->
+@if (Model.RelatedLots.Any())
+{
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-warning">
+            <i class="bi bi-arrow-up-circle me-1"></i>
+            자재 <strong>@Model.SearchMaterialCode</strong> 가 사용된 LOT — @(Model.RelatedLots.Count)건
+        </div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2">
+            @foreach (var lot in Model.RelatedLots)
+            {
+                <a href="?SearchLotNo=@lot" class="badge bg-primary text-decoration-none fs-6 p-2">
+                    <i class="bi bi-box-seam me-1"></i>@lot
+                </a>
+            }
+            </div>
+        </div>
+    </div>
+}
+
+@if (Model.FoundLot is null && Model.RelatedLots.Count == 0 &&
+     (!string.IsNullOrEmpty(Model.SearchLotNo) || !string.IsNullOrEmpty(Model.SearchMaterialCode)))
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-1"></i> 검색 결과가 없습니다.
+    </div>
+}

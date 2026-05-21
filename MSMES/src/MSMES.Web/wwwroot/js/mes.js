@@ -35,9 +35,18 @@
         overlay.addEventListener('click', closeSidebar);
     }
 
+    // 사이드바 내 nav-link 클릭 시 모바일에서 닫기
+    sidebar.querySelectorAll('.ms-sidebar__link').forEach(function(link) {
+        link.addEventListener('click', function() {
+            if (window.innerWidth < 992) {
+                closeSidebar();
+            }
+        });
+    });
+
     // 화면 크기 변경 시 모바일 상태 초기화
     window.addEventListener('resize', function () {
-        if (window.innerWidth >= 768) {
+        if (window.innerWidth >= 992) {
             closeSidebar();
         }
     });

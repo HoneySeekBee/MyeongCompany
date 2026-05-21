@@ -1,0 +1,147 @@
+@page
+@model MSMES.Web.Pages.Quality.SpcModel
+@using System.Text.Json
+@{ ViewData["Title"] = "SPC 통계적 공정관리"; }
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="h3 mb-0">SPC 통계적 공정관리</h1>
+    <form method="get" class="d-flex gap-2">
+        <select name="process" class="form-select form-select-sm" style="width:auto;" onchange="this.form.submit()">
+            @foreach (var p in Model.ProcessList)
+            {
+                var parts = p.Split('|');
+                var code = parts[0]; var label = parts.Length > 2 ? $"{parts[1]} - {parts[2]}" : code;
+                @if (Model.SelectedProcess == code)
+                {
+                    <option value="@code" selected>@label</option>
+                }
+                else
+                {
+                    <option value="@code">@label</option>
+                }
+            }
+        </select>
+    </form>
+</div>
+
+<!-- Cpk KPI cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">Cpk (수정공정능력)</div>
+            <div class="h2 fw-bold mb-0 @(Model.Cpk >= 1.67m ? "text-success" : Model.Cpk >= 1.33m ? "text-primary" : Model.Cpk >= 1.0m ? "text-warning" : "text-danger")">
+                @Model.Cpk
+            </div>
+            <div class="text-muted small">@(Model.Cpk >= 1.67m ? "우수" : Model.Cpk >= 1.33m ? "양호" : Model.Cpk >= 1.0m ? "보통" : "불량")</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">Cp (공정능력)</div>
+            <div class="h2 fw-bold mb-0">@Model.Cp</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">관리이탈 포인트</div>
+            <div class="h2 fw-bold mb-0 @(Model.OutOfControlCount > 0 ? "text-danger" : "text-success")">
+                @Model.OutOfControlCount
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm text-center py-3">
+            <div class="text-muted small">X&#772; (전체평균)</div>
+            <div class="h2 fw-bold mb-0">@Model.Xbar</div>
+            <div class="text-muted small">USL: @Model.USL / LSL: @Model.LSL</div>
+        </div>
+    </div>
+</div>
+
+<!-- X-bar chart -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h6 class="mb-0">X&#772; 관리도 (Xbar Chart)</h6>
+    </div>
+    <div class="card-body">
+        <canvas id="xbarChart" height="80"></canvas>
+    </div>
+</div>
+
+<!-- R chart -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white border-0 pt-4 pb-0">
+        <h6 class="mb-0">R 관리도 (Range Chart)</h6>
+    </div>
+    <div class="card-body">
+        <canvas id="rChart" height="60"></canvas>
+    </div>
+</div>
+
+<!-- Control limit summary -->
+<div class="card border-0 shadow-sm">
+    <div class="card-body">
+        <div class="row text-center">
+            <div class="col"><div class="text-muted small">UCL_X</div><div class="fw-bold text-danger">@Model.UCL_X</div></div>
+            <div class="col"><div class="text-muted small">CL_X (X&#772;)</div><div class="fw-bold text-primary">@Model.Xbar</div></div>
+            <div class="col"><div class="text-muted small">LCL_X</div><div class="fw-bold text-danger">@Model.LCL_X</div></div>
+            <div class="col"><div class="text-muted small">UCL_R</div><div class="fw-bold text-warning">@Model.UCL_R</div></div>
+            <div class="col"><div class="text-muted small">R&#772;</div><div class="fw-bold text-primary">@Model.Rbar</div></div>
+            <div class="col"><div class="text-muted small">USL</div><div class="fw-bold">@Model.USL</div></div>
+            <div class="col"><div class="text-muted small">LSL</div><div class="fw-bold">@Model.LSL</div></div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+const labels = @Html.Raw(JsonSerializer.Serialize(Model.SubgroupNos));
+const means  = @Html.Raw(JsonSerializer.Serialize(Model.SubgroupMeans));
+const ranges = @Html.Raw(JsonSerializer.Serialize(Model.SubgroupRanges));
+const uclX = @Model.UCL_X; const lclX = @Model.LCL_X; const clX = @Model.Xbar;
+const uclR = @Model.UCL_R; const clR  = @Model.Rbar;
+const usl  = @Model.USL;   const lsl  = @Model.LSL;
+
+// Point colors: red if out of control
+const xColors = means.map(v => (v > uclX || v < lclX) ? '#e74c3c' : '#3498db');
+const rColors = ranges.map(v => v > uclR ? '#e74c3c' : '#27ae60');
+
+new Chart(document.getElementById('xbarChart'), {
+    type: 'line',
+    data: {
+        labels,
+        datasets: [
+            { label: 'X̅', data: means, borderColor: '#3498db', backgroundColor: 'transparent',
+              pointBackgroundColor: xColors, pointRadius: 5, tension: 0.1 },
+            { label: 'UCL', data: Array(labels.length).fill(uclX), borderColor: '#e74c3c',
+              borderDash: [6,3], pointRadius: 0, borderWidth: 1.5 },
+            { label: 'CL',  data: Array(labels.length).fill(clX),  borderColor: '#2ecc71',
+              borderDash: [4,4], pointRadius: 0, borderWidth: 1.5 },
+            { label: 'LCL', data: Array(labels.length).fill(lclX), borderColor: '#e74c3c',
+              borderDash: [6,3], pointRadius: 0, borderWidth: 1.5 },
+            { label: 'USL', data: Array(labels.length).fill(usl),  borderColor: '#f39c12',
+              borderDash: [2,2], pointRadius: 0, borderWidth: 1 },
+            { label: 'LSL', data: Array(labels.length).fill(lsl),  borderColor: '#f39c12',
+              borderDash: [2,2], pointRadius: 0, borderWidth: 1 }
+        ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } },
+        scales: { y: { ticks: { callback: v => v.toFixed(3) } } } }
+});
+
+new Chart(document.getElementById('rChart'), {
+    type: 'bar',
+    data: {
+        labels,
+        datasets: [
+            { label: 'R', data: ranges, backgroundColor: rColors },
+            { label: 'UCL_R', data: Array(labels.length).fill(uclR), type: 'line',
+              borderColor: '#e74c3c', borderDash: [6,3], pointRadius: 0, borderWidth: 1.5 },
+            { label: 'R̅', data: Array(labels.length).fill(clR), type: 'line',
+              borderColor: '#2ecc71', borderDash: [4,4], pointRadius: 0, borderWidth: 1.5 }
+        ]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+}

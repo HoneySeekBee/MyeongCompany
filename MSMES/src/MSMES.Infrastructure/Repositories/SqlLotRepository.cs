@@ -72,4 +72,22 @@ public sealed class SqlLotRepository : ILotRepository
 
     public Task<string> NextNumberAsync(CancellationToken ct = default) =>
         NumberSequence.NextAsync(_factory, "LOT", "LOT", ct);
+
+    public async Task<IReadOnlyList<LotMaterial>> GetLotMaterialsAsync(string lotNo, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<LotMaterial>(
+            "SELECT * FROM LotMaterials WHERE LotNo = @lotNo ORDER BY CreatedAt",
+            new { lotNo });
+        return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<string>> FindLotsByMaterialAsync(string materialCode, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        var rows = await conn.QueryAsync<string>(
+            "SELECT DISTINCT LotNo FROM LotMaterials WHERE MaterialCode = @materialCode",
+            new { materialCode });
+        return rows.ToList();
+    }
 }
