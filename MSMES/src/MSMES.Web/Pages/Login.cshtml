@@ -281,6 +281,15 @@
             <h1 class="login-card__title">로그인</h1>
             <p class="login-card__subtitle">MSMES 계정으로 로그인하세요.</p>
 
+            <!-- 회원가입 성공 메시지 -->
+            @if (TempData["RegisterSuccess"] is string successMsg)
+            {
+                <div class="alert alert-success d-flex align-items-center gap-2 py-2" role="alert">
+                    <i class="bi bi-check-circle-fill flex-shrink-0"></i>
+                    <div>@successMsg</div>
+                </div>
+            }
+
             <!-- 오류 메시지 영역 -->
             @if (!ViewData.ModelState.IsValid)
             {
@@ -332,6 +341,10 @@
                 </div>
             </form>
 
+            <div class="text-center mt-3" style="font-size:0.85rem; color:#6c757d;">
+                계정이 없으신가요?
+                <a href="/Register" style="color: var(--ms-primary); font-weight:500;">회원가입</a>
+            </div>
             <div class="login-version">MSMES v1.0</div>
         </div>
     </div>
