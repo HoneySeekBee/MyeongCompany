@@ -243,6 +243,10 @@
                         <i class="bi bi-people"></i>
                         <span class="ms-sidebar__link-text">사용자관리</span>
                     </a>
+                    <a href="/Admin/Settings" class="ms-sidebar__link" aria-label="시스템 설정">
+                        <i class="bi bi-gear"></i>
+                        <span class="ms-sidebar__link-text">시스템 설정</span>
+                    </a>
                 }
                 <a href="/Admin/AuditLogs" class="ms-sidebar__link" aria-label="감사 로그">
                     <i class="bi bi-journal-text"></i>
@@ -377,15 +381,23 @@
 
 @await RenderSectionAsync("Scripts", required: false)
 
-<!-- 알람 뱃지 카운트 로드 -->
+<!-- 알람 뱃지 카운트 로드 (실시간 라이브 쿼리) -->
 <script>
 (async function loadAlertBadge() {
     try {
         const r = await fetch('/api/alerts/count');
         if (!r.ok) return;
-        const { count } = await r.json();
+        const data = await r.json();
+        // 새 API: { critical, warning, info, total }
+        const total = data.total ?? data.count ?? 0;
         const badge = document.getElementById('alert-badge');
-        if (badge) badge.textContent = count > 0 ? count : '';
+        if (badge) {
+            badge.textContent = total > 0 ? total : '';
+            // 위험 항목이 있으면 뱃지를 더 눈에 띄게
+            if ((data.critical ?? 0) > 0) {
+                badge.style.animation = 'none';
+            }
+        }
     } catch {}
 })();
 </script>

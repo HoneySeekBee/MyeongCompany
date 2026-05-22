@@ -1,0 +1,284 @@
+@page
+@model MSMES.Web.Pages.Admin.Settings.IndexModel
+@{
+    ViewData["Title"] = "시스템 설정";
+}
+
+<!-- 페이지 헤더 -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>시스템 설정</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/">홈</a></li>
+                <li class="breadcrumb-item active">시스템 설정</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- 저장 성공 토스트 -->
+@if (TempData["SuccessMessage"] is string msg)
+{
+    <div id="settingsToast" class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3"
+         role="alert" aria-live="assertive" aria-atomic="true" style="z-index:1090;">
+        <div class="d-flex">
+            <div class="toast-body">
+                <i class="bi bi-check-circle-fill me-2"></i>@msg
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    data-bs-dismiss="toast" aria-label="닫기"></button>
+        </div>
+    </div>
+}
+
+<form method="post">
+    @Html.AntiForgeryToken()
+
+    <!-- 탭 헤더 -->
+    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="company-tab" data-bs-toggle="tab"
+                    data-bs-target="#company" type="button" role="tab"
+                    aria-controls="company" aria-selected="true">
+                <i class="bi bi-building me-1"></i>회사 정보
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="system-tab" data-bs-toggle="tab"
+                    data-bs-target="#system" type="button" role="tab"
+                    aria-controls="system" aria-selected="false">
+                <i class="bi bi-sliders me-1"></i>시스템 설정
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="settingsTabContent">
+
+        <!-- ═══════════════════════════════════════════════
+             탭 1: 회사 정보
+        ════════════════════════════════════════════════ -->
+        <div class="tab-pane fade show active" id="company" role="tabpanel" aria-labelledby="company-tab">
+            <div class="ms-card">
+                <div class="ms-card__header">
+                    <h5 class="ms-card__title">
+                        <i class="bi bi-building me-1"></i>회사 정보
+                    </h5>
+                    <span class="text-muted-sm">시스템에 표시될 회사 기본 정보를 입력하세요.</span>
+                </div>
+                <div class="ms-card__body">
+                    <div class="row g-4">
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="CompanyName">
+                                회사명 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="CompanyName"
+                                   asp-for="CompanyName" required maxlength="200"
+                                   placeholder="(주)명성산업" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="CompanyBusinessNo">
+                                사업자등록번호
+                            </label>
+                            <input type="text" class="form-control" id="CompanyBusinessNo"
+                                   asp-for="CompanyBusinessNo" maxlength="20"
+                                   placeholder="000-00-00000" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="CompanyCeo">
+                                대표이사
+                            </label>
+                            <input type="text" class="form-control" id="CompanyCeo"
+                                   asp-for="CompanyCeo" maxlength="100"
+                                   placeholder="홍길동" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-600" for="CompanyPhone">
+                                대표전화
+                            </label>
+                            <input type="text" class="form-control" id="CompanyPhone"
+                                   asp-for="CompanyPhone" maxlength="50"
+                                   placeholder="02-0000-0000" />
+                        </div>
+
+                        <div class="col-md-8">
+                            <label class="form-label fw-600" for="CompanyAddress">
+                                본사 주소
+                            </label>
+                            <input type="text" class="form-control" id="CompanyAddress"
+                                   asp-for="CompanyAddress" maxlength="300"
+                                   placeholder="서울특별시 ..." />
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="CompanyEmail">
+                                대표 이메일
+                            </label>
+                            <input type="email" class="form-control" id="CompanyEmail"
+                                   asp-for="CompanyEmail" maxlength="200"
+                                   placeholder="contact@company.co.kr" />
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+             탭 2: 시스템 설정
+        ════════════════════════════════════════════════ -->
+        <div class="tab-pane fade" id="system" role="tabpanel" aria-labelledby="system-tab">
+
+            <!-- 재고 / 알림 -->
+            <div class="ms-card mb-4">
+                <div class="ms-card__header">
+                    <h5 class="ms-card__title">
+                        <i class="bi bi-box-seam me-1"></i>재고 &amp; 알림
+                    </h5>
+                </div>
+                <div class="ms-card__body">
+                    <div class="row g-4 align-items-center">
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="LowStockThreshold">
+                                재고 부족 경고 임계값
+                                <i class="bi bi-info-circle text-muted ms-1"
+                                   title="재고 수량이 이 값 이하이면 경보를 발생시킵니다."
+                                   data-bs-toggle="tooltip"></i>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="LowStockThreshold"
+                                       asp-for="LowStockThreshold" min="0" max="99999" />
+                                <span class="input-group-text">개</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="SessionTimeoutMinutes">
+                                세션 타임아웃
+                                <i class="bi bi-info-circle text-muted ms-1"
+                                   title="사용자 비활성 시 자동 로그아웃까지의 시간입니다."
+                                   data-bs-toggle="tooltip"></i>
+                            </label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="SessionTimeoutMinutes"
+                                       asp-for="SessionTimeoutMinutes" min="1" max="10080" />
+                                <span class="input-group-text">분</span>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4 d-flex flex-column">
+                            <label class="form-label fw-600">경보 이메일 발송</label>
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       id="AlertEmailEnabled" asp-for="AlertEmailEnabled" />
+                                <label class="form-check-label" for="AlertEmailEnabled">
+                                    이메일 알림 활성화
+                                </label>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- 번호 접두어 -->
+            <div class="ms-card">
+                <div class="ms-card__header">
+                    <h5 class="ms-card__title">
+                        <i class="bi bi-hash me-1"></i>문서 번호 접두어
+                    </h5>
+                    <span class="text-muted-sm">각 문서 번호 생성 시 사용될 접두어입니다.</span>
+                </div>
+                <div class="ms-card__body">
+                    <div class="row g-4">
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="WorkOrderPrefix">
+                                <i class="bi bi-gear me-1 text-primary"></i>작업지시 (WO)
+                            </label>
+                            <input type="text" class="form-control font-monospace text-uppercase"
+                                   id="WorkOrderPrefix" asp-for="WorkOrderPrefix"
+                                   maxlength="10" placeholder="WO"
+                                   oninput="this.value=this.value.toUpperCase()" />
+                            <div class="form-text">예: WO-20260523-001</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="SalesOrderPrefix">
+                                <i class="bi bi-file-earmark-text me-1 text-success"></i>수주 (SO)
+                            </label>
+                            <input type="text" class="form-control font-monospace text-uppercase"
+                                   id="SalesOrderPrefix" asp-for="SalesOrderPrefix"
+                                   maxlength="10" placeholder="SO"
+                                   oninput="this.value=this.value.toUpperCase()" />
+                            <div class="form-text">예: SO-20260523-001</div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-600" for="PurchaseOrderPrefix">
+                                <i class="bi bi-cart3 me-1 text-warning"></i>발주 (PO)
+                            </label>
+                            <input type="text" class="form-control font-monospace text-uppercase"
+                                   id="PurchaseOrderPrefix" asp-for="PurchaseOrderPrefix"
+                                   maxlength="10" placeholder="PO"
+                                   oninput="this.value=this.value.toUpperCase()" />
+                            <div class="form-text">예: PO-20260523-001</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- /#system -->
+
+    </div><!-- /.tab-content -->
+
+    <!-- 저장 버튼 (항상 하단 고정) -->
+    <div class="d-flex justify-content-end mt-4 gap-2">
+        <a href="/" class="btn btn-secondary">
+            <i class="bi bi-x-lg me-1"></i>취소
+        </a>
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save me-1"></i>설정 저장
+        </button>
+    </div>
+
+</form>
+
+@section Scripts {
+<script>
+// 저장 성공 토스트 자동 표시
+(function () {
+    var toastEl = document.getElementById('settingsToast');
+    if (toastEl) {
+        var t = new bootstrap.Toast(toastEl, { delay: 4000 });
+        t.show();
+    }
+
+    // Bootstrap tooltip 초기화
+    var tooltipTriggers = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggers.forEach(function (el) {
+        new bootstrap.Tooltip(el);
+    });
+
+    // 탭 상태 유지: URL 해시 기반
+    var hash = window.location.hash;
+    if (hash) {
+        var tabBtn = document.querySelector('#settingsTabs button[data-bs-target="' + hash + '"]');
+        if (tabBtn) {
+            bootstrap.Tab.getOrCreateInstance(tabBtn).show();
+        }
+    }
+    document.querySelectorAll('#settingsTabs button').forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function (e) {
+            history.replaceState(null, '', e.target.dataset.bsTarget);
+        });
+    });
+})();
+</script>
+}

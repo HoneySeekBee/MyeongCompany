@@ -3,7 +3,8 @@
 @{ ViewData["Title"] = "MES 대시보드"; }
 
 <style>
-    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+    .kpi-grid-sub { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
     .kpi-card { background: #fff; border-radius: 8px; padding: 20px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
     .kpi-card .kpi-label { font-size: 0.82rem; color: #888; margin-bottom: 4px; }
     .kpi-card .kpi-value { font-size: 1.9rem; font-weight: 700; color: #2c3e50; display: flex; align-items: center; gap: 8px; }
@@ -35,10 +36,20 @@
 <div id="loading">데이터를 불러오는 중...</div>
 <div id="dashboard-content" style="display:none;">
 
-    <!-- KPI 카드 6개 -->
+    <!-- KPI 핵심 4개 -->
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-label">금일 생산량</div>
+            <div class="kpi-label"><i class="bi bi-file-earmark-check me-1"></i>수주 잔량</div>
+            <div class="kpi-value" id="kpi-so-count">-</div>
+            <div class="kpi-sub">금액: <span id="kpi-so-amount">-</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="bi bi-gear me-1"></i>진행중 작업지시</div>
+            <div class="kpi-value" id="kpi-wo-inprogress">-</div>
+            <div class="kpi-sub">계획 <span id="kpi-wo-planned">-</span>건 / 완료 <span id="kpi-wo-completed">-</span>건</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label"><i class="bi bi-box-seam me-1"></i>금일 생산량</div>
             <div class="kpi-value">
                 <span id="kpi-produced">-</span>
                 <span id="kpi-produced-trend"></span>
@@ -49,20 +60,19 @@
             </div>
             <div id="kpi-achieve-pct" style="font-size:.75rem;color:#aaa;margin-top:3px;"></div>
         </div>
+        <div class="kpi-card" id="kpi-card-stock">
+            <div class="kpi-label"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>재고 부족</div>
+            <div class="kpi-value" id="kpi-stock-low">-</div>
+            <div class="kpi-sub">소진: <span id="kpi-stock-out">-</span>건 | 부족: <span id="kpi-stock-warning">-</span>건</div>
+        </div>
+    </div>
+
+    <!-- KPI 보조 3개 -->
+    <div class="kpi-grid-sub">
         <div class="kpi-card">
             <div class="kpi-label">금일 불량수량</div>
             <div class="kpi-value" id="kpi-defect">-</div>
             <div class="kpi-sub">불량률: <span id="kpi-defect-rate">-</span></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">수주 잔고</div>
-            <div class="kpi-value" id="kpi-so-count">-</div>
-            <div class="kpi-sub">금액: <span id="kpi-so-amount">-</span></div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-label">작업지시 현황</div>
-            <div class="kpi-value" id="kpi-wo">-</div>
-            <div class="kpi-sub">계획 / 진행중 / 완료</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">설비 가동율</div>
@@ -176,10 +186,27 @@
             ? (kpi.todayDefect / kpi.todayProduced * 100).toFixed(1) + '%'
             : '0%';
         document.getElementById('kpi-defect-rate').textContent = defRate;
-        document.getElementById('kpi-so-count').textContent    = kpi.openSalesOrderCount + ' 건';
+
+        // 핵심 KPI: 수주 잔량
+        document.getElementById('kpi-so-count').textContent    = fmt(kpi.openSalesOrderCount) + ' 건';
         document.getElementById('kpi-so-amount').textContent   = fmtMoney(kpi.openSalesOrderAmount);
-        document.getElementById('kpi-wo').textContent          =
-            kpi.workOrderPlanned + ' / ' + kpi.workOrderInProgress + ' / ' + kpi.workOrderCompleted;
+
+        // 핵심 KPI: 진행중 작업지시
+        document.getElementById('kpi-wo-inprogress').textContent = kpi.workOrderInProgress + ' 건';
+        document.getElementById('kpi-wo-planned').textContent    = fmt(kpi.workOrderPlanned);
+        document.getElementById('kpi-wo-completed').textContent  = fmt(kpi.workOrderCompleted);
+
+        // 핵심 KPI: 재고 부족
+        const stockLow  = kpi.inventoryLow  ?? 0;
+        const stockOut  = kpi.inventoryOut  ?? 0;
+        const stockTotal = stockLow + stockOut;
+        document.getElementById('kpi-stock-low').textContent     = stockTotal + ' 건';
+        document.getElementById('kpi-stock-out').textContent     = stockOut;
+        document.getElementById('kpi-stock-warning').textContent = stockLow;
+        // 재고 부족이 있으면 카드 강조
+        const stockCard = document.getElementById('kpi-card-stock');
+        if (stockTotal > 0) stockCard.style.borderTop = '3px solid #f39c12';
+
         document.getElementById('kpi-eq-running').textContent  = kpi.equipmentRunning + ' 대';
         document.getElementById('kpi-eq-maint').textContent    = kpi.equipmentMaintenance;
         document.getElementById('kpi-eq-break').textContent    = kpi.equipmentBreakdown;
@@ -263,21 +290,40 @@
 
     async function loadAlerts() {
         try {
+            // 상위 3건 알림 (실시간 쿼리 기반)
             const r      = await fetch('/api/dashboard/alerts');
             if (!r.ok) return;
             const alerts = await r.json();
             const div    = document.getElementById('recent-alerts');
+
+            const severityLabel = { 3: '위험', 2: '경고', 1: '정보' };
+            const cssClass      = { 3: 'danger', 2: 'warning', 1: 'info' };
+
             if (!alerts.length) {
-                div.innerHTML = '<p class="text-muted small">알람 없음</p>';
+                div.innerHTML = `
+                    <div style="background:#fff;border-radius:8px;padding:20px;text-align:center;color:#aaa;box-shadow:0 1px 4px rgba(0,0,0,.06)">
+                        <i class="bi bi-check-circle text-success me-1"></i>모든 항목이 정상입니다
+                    </div>`;
                 return;
             }
             div.innerHTML = alerts.map(a => `
-                <div style="display:flex;align-items:center;gap:10px;padding:8px;background:#fff;border-radius:6px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-                    <i class="bi ${a.alertTypeIcon} text-${a.severityCss} fs-5"></i>
-                    <div style="flex:1;font-size:.85rem;">${a.title}</div>
-                    <span class="badge bg-${a.severityCss}">${a.severity === 3 ? '위험' : a.severity === 2 ? '경고' : '정보'}</span>
-                    <a href="/Alerts" style="font-size:.75rem;color:#1a73e8;">보기</a>
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#fff;border-radius:8px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid var(--bs-${cssClass[a.severity] ?? 'secondary'});">
+                    <i class="bi ${a.alertTypeIcon} text-${cssClass[a.severity] ?? 'secondary'} fs-5"></i>
+                    <div style="flex:1;">
+                        <div style="font-size:.86rem;font-weight:600;color:#2c3e50;">${a.title}</div>
+                        <div style="font-size:.78rem;color:#aaa;">${a.message ?? ''}</div>
+                    </div>
+                    <span class="badge bg-${cssClass[a.severity] ?? 'secondary'}">${severityLabel[a.severity] ?? '정보'}</span>
+                    <a href="${a.linkUrl ?? '/Alerts'}" style="font-size:.75rem;color:#1a73e8;white-space:nowrap;">상세보기</a>
                 </div>`).join('');
+
+            // 헤더 뱃지도 함께 업데이트 (count API 호출)
+            const countRes = await fetch('/api/alerts/count');
+            if (countRes.ok) {
+                const { total } = await countRes.json();
+                const badge = document.getElementById('alert-badge');
+                if (badge) badge.textContent = total > 0 ? total : '';
+            }
         } catch (_) { /* 알람 로드 실패는 무시 */ }
     }
 

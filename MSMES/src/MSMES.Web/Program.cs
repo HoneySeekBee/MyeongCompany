@@ -126,6 +126,9 @@ else
     app.UseHsts();
 }
 
+// 404/403 등 HTTP 상태 코드를 /StatusCode?code={0} 페이지로 리다이렉트
+app.UseStatusCodePagesWithReExecute("/StatusCode", "?code={0}");
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();

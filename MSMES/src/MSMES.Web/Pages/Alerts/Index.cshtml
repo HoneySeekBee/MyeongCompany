@@ -1,102 +1,272 @@
 @page
 @model MSMES.Web.Pages.Alerts.IndexModel
-@{ ViewData["Title"] = "알람/경보"; }
+@{ ViewData["Title"] = "알림 / 경보"; }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="h3 mb-0">알람 / 경보</h1>
-    <a href="?showResolved=@(!Model.ShowResolved)" class="btn btn-outline-secondary btn-sm">
-        @(Model.ShowResolved ? "미해결만 보기" : "해결된 항목 포함")
-    </a>
+<style>
+    .alert-section { margin-bottom: 28px; }
+    .alert-card {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.08);
+        margin-bottom: 10px;
+        display: flex;
+        align-items: stretch;
+        overflow: hidden;
+    }
+    .alert-card .alert-border { width: 5px; flex-shrink: 0; }
+    .alert-card.critical .alert-border { background: #e74c3c; }
+    .alert-card.warning  .alert-border { background: #f39c12; }
+    .alert-card.info     .alert-border { background: #3498db; }
+    .alert-card .alert-body { padding: 14px 18px; flex: 1; display: flex; align-items: center; gap: 14px; }
+    .alert-card .alert-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .alert-card.critical .alert-icon { color: #e74c3c; }
+    .alert-card.warning  .alert-icon { color: #f39c12; }
+    .alert-card.info     .alert-icon { color: #3498db; }
+    .alert-card .alert-content { flex: 1; }
+    .alert-card .alert-title { font-weight: 600; font-size: 0.92rem; color: #2c3e50; margin-bottom: 2px; }
+    .alert-card .alert-desc  { font-size: 0.82rem; color: #888; }
+    .alert-card .alert-action { flex-shrink: 0; }
+    .summary-badges { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .summary-badge {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.08);
+        padding: 14px 22px;
+        text-align: center;
+        min-width: 120px;
+    }
+    .summary-badge .badge-count { font-size: 2rem; font-weight: 700; }
+    .summary-badge .badge-label { font-size: 0.78rem; color: #888; margin-top: 2px; }
+    .section-header {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 1rem; font-weight: 600; color: #2c3e50;
+        margin-bottom: 10px; margin-top: 24px;
+    }
+    .empty-state {
+        background: #fff; border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0,0,0,.06);
+        text-align: center; padding: 28px;
+        color: #aaa; font-size: 0.88rem;
+    }
+    #loading-alerts { text-align: center; padding: 40px; color: #aaa; font-size: 0.95rem; }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+    <h1 style="margin:0;">알림 / 경보</h1>
+    <div>
+        <span id="refresh-time" class="text-muted small me-2"></span>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadAlerts()">
+            <i class="bi bi-arrow-clockwise me-1"></i>새로고침
+        </button>
+    </div>
+</div>
+<p class="text-muted small mb-4">실시간 데이터 기반 자동 생성 알림 — 재고·작업지시·수주를 분석합니다.</p>
+
+<!-- 요약 뱃지 -->
+<div class="summary-badges" id="summary-badges">
+    <div class="summary-badge">
+        <div class="badge-count text-danger" id="cnt-critical">-</div>
+        <div class="badge-label"><i class="bi bi-exclamation-octagon-fill text-danger me-1"></i>위험</div>
+    </div>
+    <div class="summary-badge">
+        <div class="badge-count text-warning" id="cnt-warning">-</div>
+        <div class="badge-label"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>경고</div>
+    </div>
+    <div class="summary-badge">
+        <div class="badge-count text-primary" id="cnt-info">-</div>
+        <div class="badge-label"><i class="bi bi-info-circle-fill text-primary me-1"></i>정보</div>
+    </div>
+    <div class="summary-badge">
+        <div class="badge-count text-dark" id="cnt-total">-</div>
+        <div class="badge-label">전체</div>
+    </div>
 </div>
 
-<div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card border-danger border-0 shadow-sm text-center py-3">
-            <div class="text-danger small fw-semibold">위험</div>
-            <div class="h2 fw-bold text-danger mb-0">@Model.DangerCount</div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-warning small fw-semibold">경고</div>
-            <div class="h2 fw-bold text-warning mb-0">@Model.WarningCount</div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm text-center py-3">
-            <div class="text-muted small fw-semibold">미확인</div>
-            <div class="h2 fw-bold mb-0">@Model.UnreadCount</div>
-        </div>
-    </div>
-</div>
+<div id="loading-alerts">데이터를 불러오는 중...</div>
+<div id="alerts-content" style="display:none;">
 
-<div class="d-flex flex-column gap-3">
-@foreach (var alert in Model.Alerts)
-{
-    <div class="card border-0 shadow-sm @(alert.IsResolved ? "opacity-50" : "") @(!alert.IsRead && !alert.IsResolved ? "border-start border-4 border-" + alert.SeverityCss : "")">
-        <div class="card-body d-flex align-items-start gap-3">
-            <div class="flex-shrink-0 mt-1">
-                <i class="bi @alert.AlertTypeIcon fs-4 text-@alert.SeverityCss"></i>
-            </div>
-            <div class="flex-grow-1">
-                <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="badge bg-@alert.SeverityCss">@alert.SeverityName</span>
-                    @if (!alert.IsRead && !alert.IsResolved)
-                    {
-                        <span class="badge bg-dark">NEW</span>
-                    }
-                    @if (alert.IsResolved)
-                    {
-                        <span class="badge bg-secondary">해결됨</span>
-                    }
-                    <span class="text-muted small ms-auto">@alert.CreatedAt.ToLocalTime().ToString("MM/dd HH:mm")</span>
-                </div>
-                <div class="fw-semibold mb-1">@alert.Title</div>
-                <div class="text-muted small">@alert.Message</div>
-            </div>
-            @if (!alert.IsResolved)
-            {
-                <div class="flex-shrink-0 d-flex gap-1">
-                    @if (!alert.IsRead)
-                    {
-                        <button class="btn btn-sm btn-outline-secondary" onclick="markRead(@alert.Id, this)">확인</button>
-                    }
-                    <button class="btn btn-sm btn-outline-success" onclick="resolve(@alert.Id, this)">해결</button>
-                </div>
-            }
-        </div>
+    <!-- 재고 부족 (위험/경고) -->
+    <div class="section-header">
+        <i class="bi bi-box-seam text-danger"></i>
+        재고 부족
+        <span id="badge-stock" class="badge bg-danger ms-1" style="display:none;"></span>
     </div>
-}
-@if (!Model.Alerts.Any())
-{
-    <div class="card border-0 shadow-sm">
-        <div class="card-body text-center text-muted py-5">
-            <i class="bi bi-check-circle fs-1 d-block mb-2 text-success"></i>
-            알람이 없습니다.
-        </div>
+    <div id="section-stock"></div>
+
+    <!-- 납기 임박 -->
+    <div class="section-header">
+        <i class="bi bi-clock-fill text-warning"></i>
+        납기 임박
+        <span id="badge-duesoon" class="badge bg-warning text-dark ms-1" style="display:none;"></span>
     </div>
-}
+    <div id="section-duesoon"></div>
+
+    <!-- 작업지시 지연 -->
+    <div class="section-header">
+        <i class="bi bi-exclamation-triangle-fill text-danger"></i>
+        작업지시 지연
+        <span id="badge-overdue" class="badge bg-danger ms-1" style="display:none;"></span>
+    </div>
+    <div id="section-overdue"></div>
+
+    <!-- 미확정 수주 -->
+    <div class="section-header">
+        <i class="bi bi-file-earmark-x text-primary"></i>
+        미확정 수주
+        <span id="badge-unconfirmed" class="badge bg-primary ms-1" style="display:none;"></span>
+    </div>
+    <div id="section-unconfirmed"></div>
+
 </div>
 
 @section Scripts {
 <script>
-async function markRead(id, btn) {
-    await fetch(`/api/alerts/${id}/read`, { method: 'POST' });
-    btn.closest('.card').querySelector('.badge.bg-dark')?.remove();
-    btn.remove();
-    updateBadge();
-}
-async function resolve(id, btn) {
-    await fetch(`/api/alerts/${id}/resolve`, { method: 'POST' });
-    btn.closest('.card').classList.add('opacity-50');
-    btn.closest('.d-flex.gap-1').innerHTML = '<span class="badge bg-secondary">해결됨</span>';
-    updateBadge();
-}
-async function updateBadge() {
-    const r = await fetch('/api/alerts/count');
-    const { count } = await r.json();
-    const badge = document.getElementById('alert-badge');
-    if (badge) badge.textContent = count > 0 ? count : '';
-}
+(function () {
+    function makeCard(cssClass, icon, title, desc, linkUrl, linkLabel) {
+        return `
+            <div class="alert-card ${cssClass}">
+                <div class="alert-border"></div>
+                <div class="alert-body">
+                    <i class="bi ${icon} alert-icon"></i>
+                    <div class="alert-content">
+                        <div class="alert-title">${title}</div>
+                        <div class="alert-desc">${desc}</div>
+                    </div>
+                    <div class="alert-action">
+                        <a href="${linkUrl}" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-right me-1"></i>${linkLabel ?? '상세보기'}
+                        </a>
+                    </div>
+                </div>
+            </div>`;
+    }
+
+    function emptyState() {
+        return `<div class="empty-state">
+            <i class="bi bi-check-circle text-success d-block mb-2" style="font-size:2rem;"></i>
+            모든 항목이 정상입니다
+        </div>`;
+    }
+
+    function fmtDate(d) {
+        if (!d) return '-';
+        const dt = new Date(d);
+        return dt.toLocaleDateString('ko-KR', { year:'numeric', month:'2-digit', day:'2-digit' });
+    }
+
+    function setBadge(id, count) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (count > 0) { el.textContent = count; el.style.display = ''; }
+        else { el.style.display = 'none'; }
+    }
+
+    async function loadAlerts() {
+        const loading = document.getElementById('loading-alerts');
+        const content = document.getElementById('alerts-content');
+        loading.style.display = 'block';
+        content.style.display = 'none';
+
+        try {
+            const [stockRes, dueSoonRes, overdueRes, unconfirmedRes] =
+                await Promise.all([
+                    fetch('/api/alerts/live/stock'),
+                    fetch('/api/alerts/live/duesoon'),
+                    fetch('/api/alerts/live/overdue'),
+                    fetch('/api/alerts/live/unconfirmed')
+                ]);
+
+            const stock       = stockRes.ok       ? await stockRes.json()       : [];
+            const dueSoon     = dueSoonRes.ok      ? await dueSoonRes.json()     : [];
+            const overdue     = overdueRes.ok      ? await overdueRes.json()     : [];
+            const unconfirmed = unconfirmedRes.ok  ? await unconfirmedRes.json() : [];
+
+            // 재고 부족
+            const stockEl = document.getElementById('section-stock');
+            if (stock.length === 0) {
+                stockEl.innerHTML = emptyState();
+            } else {
+                stockEl.innerHTML = stock.map(i => {
+                    const cls  = i.currentStock <= 0 ? 'critical' : 'warning';
+                    const icon = 'bi-box-seam';
+                    const desc = `현재 재고: ${i.currentStock} ${i.unit ?? ''} | 안전재고: ${i.safetyStock}`;
+                    return makeCard(cls, icon, `${i.itemCode} ${i.itemName}`, desc, '/Inventory', '재고 확인');
+                }).join('');
+            }
+            setBadge('badge-stock', stock.length);
+
+            // 납기 임박
+            const dueSoonEl = document.getElementById('section-duesoon');
+            if (dueSoon.length === 0) {
+                dueSoonEl.innerHTML = emptyState();
+            } else {
+                dueSoonEl.innerHTML = dueSoon.map(w =>
+                    makeCard('warning', 'bi-clock-fill',
+                        `${w.workOrderNo} — ${w.itemName}`,
+                        `계획 완료일: ${fmtDate(w.plannedEndDate)}`,
+                        '/WorkOrders', '작업지시 확인')
+                ).join('');
+            }
+            setBadge('badge-duesoon', dueSoon.length);
+
+            // 작업지시 지연
+            const overdueEl = document.getElementById('section-overdue');
+            if (overdue.length === 0) {
+                overdueEl.innerHTML = emptyState();
+            } else {
+                overdueEl.innerHTML = overdue.map(w =>
+                    makeCard('critical', 'bi-exclamation-triangle-fill',
+                        `${w.workOrderNo} — ${w.itemName}`,
+                        `계획 완료일 ${fmtDate(w.plannedEndDate)} 초과`,
+                        '/WorkOrders', '작업지시 확인')
+                ).join('');
+            }
+            setBadge('badge-overdue', overdue.length);
+
+            // 미확정 수주
+            const unconfirmedEl = document.getElementById('section-unconfirmed');
+            if (unconfirmed.length === 0) {
+                unconfirmedEl.innerHTML = emptyState();
+            } else {
+                unconfirmedEl.innerHTML = unconfirmed.map(s =>
+                    makeCard('info', 'bi-file-earmark-x',
+                        `${s.salesOrderNo} — ${s.customerName}`,
+                        `수주일: ${fmtDate(s.orderDate)} (3일 이상 미확정)`,
+                        '/SalesOrders', '수주 확인')
+                ).join('');
+            }
+            setBadge('badge-unconfirmed', unconfirmed.length);
+
+            // 요약 뱃지 업데이트
+            const critical = overdue.length + stock.filter(i => i.currentStock <= 0).length;
+            const warning  = dueSoon.length + stock.filter(i => i.currentStock > 0).length;
+            const info     = unconfirmed.length;
+            const total    = stock.length + dueSoon.length + overdue.length + unconfirmed.length;
+
+            document.getElementById('cnt-critical').textContent = critical;
+            document.getElementById('cnt-warning').textContent  = warning;
+            document.getElementById('cnt-info').textContent     = info;
+            document.getElementById('cnt-total').textContent    = total;
+
+            // 헤더 뱃지 업데이트
+            const headerBadge = document.getElementById('alert-badge');
+            if (headerBadge) headerBadge.textContent = total > 0 ? total : '';
+
+            document.getElementById('refresh-time').textContent =
+                '최종 갱신: ' + new Date().toLocaleTimeString('ko-KR');
+
+        } catch (e) {
+            console.error('알림 로드 오류:', e);
+        } finally {
+            loading.style.display = 'none';
+            content.style.display = 'block';
+        }
+    }
+
+    // 전역 노출 (새로고침 버튼용)
+    window.loadAlerts = loadAlerts;
+
+    loadAlerts();
+})();
 </script>
 }

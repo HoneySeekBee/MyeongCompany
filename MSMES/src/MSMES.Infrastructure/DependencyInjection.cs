@@ -14,6 +14,7 @@ using MSMES.Domain.ProductionPlan;
 using MSMES.Domain.PurchaseOrder;
 using MSMES.Domain.Quality;
 using MSMES.Domain.Receiving;
+using MSMES.Domain.Settings;
 using MSMES.Domain.Spc;
 using MSMES.Domain.SalesOrder;
 using MSMES.Domain.Shipment;
@@ -21,6 +22,7 @@ using MSMES.Domain.WorkOrder;
 using MSMES.Infrastructure.Auth;
 using MSMES.Infrastructure.Persistence;
 using MSMES.Infrastructure.Repositories;
+using MSMES.Infrastructure.Settings;
 
 namespace MSMES.Infrastructure;
 
@@ -49,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IGoodsReceiptRepository, SqlGoodsReceiptRepository>();
         services.AddScoped<ISpcRepository, SqlSpcRepository>();
         services.AddScoped<IPartnerRepository, SqlPartnerRepository>();
+        services.AddScoped<ISettingsRepository, SettingsRepository>();
 
         services.Configure<JwtOptions>(config.GetSection("Jwt"));
         // Application.Common 인터페이스로 등록 (Application 레이어에서 주입 가능)

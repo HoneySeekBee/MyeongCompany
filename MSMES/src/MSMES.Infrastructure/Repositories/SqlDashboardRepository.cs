@@ -10,7 +10,7 @@ public sealed class SqlDashboardRepository : IDashboardRepository
 
     public SqlDashboardRepository(ISqlConnectionFactory factory) => _factory = factory;
 
-    // 수주 잔고: Closed(4)/Cancelled 제외한 건수 + 수량 합계
+    // 수주 잔고: 확정(1)/생산중(2) 상태 건수 + 수량 합계
     public async Task<(int Count, decimal Amount)> GetOpenSalesOrderBacklogAsync(CancellationToken ct = default)
     {
         using var conn = _factory.Create();
@@ -24,7 +24,7 @@ public sealed class SqlDashboardRepository : IDashboardRepository
                 FROM dbo.SalesOrderItems
                 GROUP BY SalesOrderNo
             ) i ON i.SalesOrderNo = so.SalesOrderNo
-            WHERE so.Status NOT IN (3, 4)";
+            WHERE so.Status IN (1, 2)";
         var row = await conn.QuerySingleAsync(new CommandDefinition(sql, cancellationToken: ct));
         return ((int)(row.Count ?? 0), (decimal)(row.Amount ?? 0m));
     }
@@ -44,19 +44,47 @@ public sealed class SqlDashboardRepository : IDashboardRepository
     }
 
     // 일자별 생산수량 (라인차트용, 최근 7일)
+    // ProductionResults 테이블이 있으면 우선 사용, 없으면 WorkOrders.ProducedQuantity 집계
     public async Task<IReadOnlyList<(DateTime Date, decimal Produced, decimal Defect)>> GetDailyProductionAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
         using var conn = _factory.Create();
-        const string sql = @"
-            SELECT
-                CAST(StartTime AS DATE)         AS Date,
-                SUM(ProducedQuantity)           AS Produced,
-                SUM(DefectQuantity)             AS Defect
-            FROM dbo.ProductionResults
-            WHERE StartTime >= @from AND StartTime < DATEADD(DAY, 1, @to)
-            GROUP BY CAST(StartTime AS DATE)
-            ORDER BY CAST(StartTime AS DATE)";
+
+        // ProductionResults 존재 여부 확인
+        const string checkSql = @"
+            SELECT COUNT(*) FROM dbo.ProductionResults
+            WHERE StartTime >= @from AND StartTime < DATEADD(DAY, 1, @to)";
+        var prCount = await conn.ExecuteScalarAsync<int>(
+            new CommandDefinition(checkSql, new { from, to }, cancellationToken: ct));
+
+        string sql;
+        if (prCount > 0)
+        {
+            // ProductionResults 기반 집계
+            sql = @"
+                SELECT
+                    CAST(StartTime AS DATE)   AS Date,
+                    SUM(ProducedQuantity)     AS Produced,
+                    SUM(DefectQuantity)       AS Defect
+                FROM dbo.ProductionResults
+                WHERE StartTime >= @from AND StartTime < DATEADD(DAY, 1, @to)
+                GROUP BY CAST(StartTime AS DATE)
+                ORDER BY CAST(StartTime AS DATE)";
+        }
+        else
+        {
+            // WorkOrders.ProducedQuantity 기반 집계 (생산실적 미입력 환경)
+            sql = @"
+                SELECT
+                    CAST(CreatedAt AS DATE)   AS Date,
+                    SUM(ProducedQuantity)     AS Produced,
+                    CAST(0 AS DECIMAL(18,4))  AS Defect
+                FROM dbo.WorkOrders
+                WHERE CreatedAt >= @from AND CreatedAt < DATEADD(DAY, 1, @to)
+                GROUP BY CAST(CreatedAt AS DATE)
+                ORDER BY CAST(CreatedAt AS DATE)";
+        }
+
         var rows = await conn.QueryAsync(new CommandDefinition(sql, new { from, to }, cancellationToken: ct));
         return rows.Select(r => ((DateTime)r.Date, (decimal)r.Produced, (decimal)r.Defect)).ToList();
     }
@@ -70,8 +98,9 @@ public sealed class SqlDashboardRepository : IDashboardRepository
             SELECT TOP (@take)
                 WorkOrderNo,
                 ItemCode,
-                PlannedQuantity AS Quantity,
-                CAST(Status AS NVARCHAR(50)) AS Status,
+                ISNULL(ItemName, ItemCode)           AS ItemName,
+                PlannedQuantity                      AS Quantity,
+                CAST(Status AS NVARCHAR(50))         AS Status,
                 CreatedAt
             FROM dbo.WorkOrders
             ORDER BY CreatedAt DESC";
