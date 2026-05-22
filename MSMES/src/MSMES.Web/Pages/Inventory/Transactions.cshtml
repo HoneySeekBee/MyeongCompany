@@ -1,0 +1,444 @@
+@page
+@model MSMES.Web.Pages.Inventory.TransactionsModel
+@using MSMES.Domain.Inventory
+@{ ViewData["Title"] = "입출고 이력"; }
+
+<!-- ════════════════════════════════════════════
+     페이지 헤더
+════════════════════════════════════════════ -->
+<div class="ms-page-header">
+    <div class="ms-page-header__left">
+        <h1>입출고 이력</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="/" class="text-decoration-none">홈</a></li>
+                <li class="breadcrumb-item"><a href="/Inventory" class="text-decoration-none">재고 관리</a></li>
+                <li class="breadcrumb-item active" aria-current="page">입출고 이력</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="ms-page-header__right d-flex gap-2 flex-wrap">
+        <a href="/Inventory" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-box-seam me-1"></i>재고 현황
+        </a>
+        <button type="button" class="btn btn-primary btn-sm" id="btnOpenAdjustModal">
+            <i class="bi bi-sliders me-1"></i>재고 조정
+        </button>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     KPI 카드 3개
+════════════════════════════════════════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-4">
+        <div class="kpi-card kpi-success">
+            <div class="kpi-card__label">
+                금일 입고건수
+                <i class="bi bi-box-arrow-in-down"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-success);">@Model.TodayIn</div>
+            <div class="kpi-card__sub">오늘 입고 처리 건수</div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-4">
+        <div class="kpi-card kpi-danger">
+            <div class="kpi-card__label">
+                금일 출고건수
+                <i class="bi bi-box-arrow-up"></i>
+            </div>
+            <div class="kpi-card__value" style="color:var(--ms-danger);">@Model.TodayOut</div>
+            <div class="kpi-card__sub">오늘 출고 처리 건수</div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-4">
+        <div class="kpi-card kpi-warning">
+            <div class="kpi-card__label">
+                금일 조정건수
+                <i class="bi bi-sliders"></i>
+            </div>
+            <div class="kpi-card__value" style="color:#e67e22;">@Model.TodayAdj</div>
+            <div class="kpi-card__sub">오늘 조정 처리 건수</div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     필터 + 테이블
+════════════════════════════════════════════ -->
+<div class="ms-card">
+    <div class="ms-card__header">
+        <span class="ms-card__title">
+            <i class="bi bi-arrow-left-right me-1"></i>트랜잭션 이력
+            <span class="badge bg-secondary ms-1">@Model.Transactions.Count</span>
+        </span>
+    </div>
+
+    <!-- 필터 -->
+    <div class="ms-filter-card m-3 mb-0">
+        <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label mb-1 text-muted-sm">품목코드</label>
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="txSearch" class="form-control"
+                           placeholder="품목코드 검색..." autocomplete="off"
+                           value="@(Model.FilterItemCode ?? "")" />
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="form-label mb-1 text-muted-sm">트랜잭션 유형</label>
+                <select id="txTypeFilter" class="form-select form-select-sm">
+                    <option value="">전체 유형</option>
+                    <option value="Receipt">입고</option>
+                    <option value="Issue">출고</option>
+                    <option value="Adjustment">조정</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label mb-1 text-muted-sm">시작일</label>
+                <input type="date" id="txFromDate" class="form-control form-control-sm" />
+            </div>
+            <div class="col-6 col-md-2">
+                <label class="form-label mb-1 text-muted-sm">종료일</label>
+                <input type="date" id="txToDate" class="form-control form-control-sm" />
+            </div>
+            <div class="col-12 col-md-2 d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="btnTxFilterReset">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>초기화
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 테이블 -->
+    <div class="mes-table-wrapper p-3">
+        <table class="mes-table" id="txTable">
+            <thead>
+                <tr>
+                    <th>거래일시</th>
+                    <th>품목코드</th>
+                    <th>품목명</th>
+                    <th>창고</th>
+                    <th class="text-center">유형</th>
+                    <th class="text-end">수량</th>
+                    <th class="text-end">변경 전</th>
+                    <th class="text-end">변경 후</th>
+                    <th>비고</th>
+                    <th>참조번호</th>
+                    <th>처리자</th>
+                </tr>
+            </thead>
+            <tbody id="txTbody">
+            @foreach (var tx in Model.Transactions)
+            {
+                var txDate   = tx.TransactionDate.ToLocalTime();
+                var txTypeStr = tx.TransactionType.ToString();
+                <tr class="tx-row"
+                    data-code="@tx.ItemCode.ToLower()"
+                    data-type="@txTypeStr"
+                    data-date="@txDate.ToString("yyyy-MM-dd")">
+                    <td class="text-muted-sm">@txDate.ToString("yyyy-MM-dd HH:mm")</td>
+                    <td class="fw-600 text-primary-ms">@tx.ItemCode</td>
+                    <td>@(string.IsNullOrWhiteSpace(tx.ItemName) ? "-" : tx.ItemName)</td>
+                    <td>
+                        <span class="ms-badge" style="background:#e8f0fe;color:#1a73e8;">@tx.WarehouseCode</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge @tx.TypeCss">@tx.TypeName</span>
+                    </td>
+                    <td class="text-end @tx.QtyCss">
+                        @tx.QtySign@tx.Quantity.ToString("N2")
+                    </td>
+                    <td class="text-end text-muted-sm">@tx.StockBefore.ToString("N2")</td>
+                    <td class="text-end text-muted-sm">@tx.StockAfter.ToString("N2")</td>
+                    <td class="text-muted-sm">@(tx.Remarks ?? "-")</td>
+                    <td class="text-muted-sm">@(tx.ReferenceNo ?? "-")</td>
+                    <td class="text-muted-sm">@(tx.CreatedBy ?? "-")</td>
+                </tr>
+            }
+            @if (!Model.Transactions.Any())
+            {
+                <tr id="txEmpty">
+                    <td colspan="11" class="text-center py-4 text-muted-sm">
+                        <i class="bi bi-inbox fs-3 d-block mb-2"></i>입출고 이력이 없습니다.
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+        <div id="txNoResult" class="text-center py-4 text-muted-sm d-none">
+            <i class="bi bi-search fs-3 d-block mb-2"></i>검색 결과가 없습니다.
+        </div>
+    </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════
+     재고 조정 모달
+════════════════════════════════════════════ -->
+<div class="modal fade" id="adjustModal" tabindex="-1" aria-labelledby="adjustModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header" id="adjustModalHeader">
+                <h5 class="modal-title" id="adjustModalLabel">
+                    <i class="bi bi-sliders me-2"></i>재고 조정
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <div class="modal-body">
+                <form id="adjustForm" class="needs-validation" novalidate>
+                    <input type="hidden" id="adjWarehouseCode" />
+
+                    <div class="row g-3">
+                        <!-- 품목 선택 -->
+                        <div class="col-12">
+                            <label class="form-label">품목 선택 <span class="text-danger">*</span></label>
+                            <select id="adjItemSelect" class="form-select form-select-sm" required>
+                                <option value="">-- 품목을 선택하세요 --</option>
+                                @foreach (var inv in Model.Inventories.OrderBy(i => i.ItemCode))
+                                {
+                                    var optLabel = $"{inv.ItemCode} {inv.ItemName} [{inv.WarehouseCode} / 현재: {inv.CurrentStock:N0} {inv.Unit}]";
+                                    <option value="@inv.ItemCode"
+                                            data-warehouse="@inv.WarehouseCode"
+                                            data-item-name="@inv.ItemName"
+                                            data-unit="@inv.Unit"
+                                            data-current-stock="@inv.CurrentStock.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                        @optLabel
+                                    </option>
+                                }
+                            </select>
+                            <div class="invalid-feedback">품목을 선택하세요.</div>
+                        </div>
+
+                        <!-- 현재 재고 (읽기전용) -->
+                        <div class="col-6">
+                            <label class="form-label">현재 재고</label>
+                            <input type="text" id="adjCurrentStock" class="form-control form-control-sm" readonly placeholder="-" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">단위</label>
+                            <input type="text" id="adjUnit" class="form-control form-control-sm" readonly placeholder="-" />
+                        </div>
+
+                        <!-- 유형 -->
+                        <div class="col-12">
+                            <label class="form-label">유형 <span class="text-danger">*</span></label>
+                            <select id="adjType" class="form-select form-select-sm" required>
+                                <option value="0">입고 (Receipt)</option>
+                                <option value="1">출고 (Issue)</option>
+                                <option value="2">조정 (Adjustment)</option>
+                            </select>
+                            <div class="invalid-feedback">유형을 선택하세요.</div>
+                        </div>
+
+                        <!-- 수량 -->
+                        <div class="col-12">
+                            <label class="form-label" id="adjQtyLabel">
+                                수량 <span class="text-danger">*</span>
+                                <small class="text-muted" id="adjQtyHint">(입고 수량)</small>
+                            </label>
+                            <input type="number" id="adjQuantity" class="form-control form-control-sm"
+                                   min="0.01" step="0.01" required placeholder="수량 입력" />
+                            <div class="invalid-feedback">수량은 0보다 커야 합니다.</div>
+                            <div id="adjAdjHint" class="form-text text-muted d-none">
+                                조정(Adjustment): 입력값을 절대 재고수량으로 설정합니다.
+                            </div>
+                        </div>
+
+                        <!-- 비고 -->
+                        <div class="col-12">
+                            <label class="form-label">비고 <span class="text-danger">*</span></label>
+                            <textarea id="adjReason" class="form-control form-control-sm" rows="2"
+                                      required placeholder="처리 사유를 입력하세요" maxlength="300"
+                                      minlength="2"></textarea>
+                            <div class="invalid-feedback">비고(사유)를 입력하세요.</div>
+                        </div>
+
+                        <!-- 참조번호 -->
+                        <div class="col-12">
+                            <label class="form-label">참조번호 <small class="text-muted">(수주번호, 발주번호 등 — 선택)</small></label>
+                            <input type="text" id="adjReference" class="form-control form-control-sm"
+                                   placeholder="선택 입력" maxlength="100" />
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary btn-sm" id="btnAdjSave">
+                    <i class="bi bi-check-lg me-1"></i><span id="btnAdjLabel">저장</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    /* ── 테이블 필터 ────────────────────────────── */
+    function filterTxTable() {
+        var searchVal = (document.getElementById('txSearch').value || '').toLowerCase().trim();
+        var typeVal   = document.getElementById('txTypeFilter').value || '';
+        var fromVal   = document.getElementById('txFromDate').value || '';
+        var toVal     = document.getElementById('txToDate').value || '';
+        var rows = document.querySelectorAll('.tx-row');
+        var visibleCount = 0;
+
+        rows.forEach(function (row) {
+            var code = row.getAttribute('data-code') || '';
+            var type = row.getAttribute('data-type') || '';
+            var date = row.getAttribute('data-date') || '';
+
+            var matchCode = !searchVal || code.includes(searchVal);
+            var matchType = !typeVal   || type === typeVal;
+            var matchFrom = !fromVal   || date >= fromVal;
+            var matchTo   = !toVal     || date <= toVal;
+
+            if (matchCode && matchType && matchFrom && matchTo) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        var noResult = document.getElementById('txNoResult');
+        if (noResult) noResult.classList.toggle('d-none', visibleCount > 0);
+    }
+
+    document.getElementById('txSearch').addEventListener('input', filterTxTable);
+    document.getElementById('txTypeFilter').addEventListener('change', filterTxTable);
+    document.getElementById('txFromDate').addEventListener('change', filterTxTable);
+    document.getElementById('txToDate').addEventListener('change', filterTxTable);
+    document.getElementById('btnTxFilterReset').addEventListener('click', function () {
+        document.getElementById('txSearch').value = '';
+        document.getElementById('txTypeFilter').value = '';
+        document.getElementById('txFromDate').value = '';
+        document.getElementById('txToDate').value = '';
+        filterTxTable();
+    });
+
+    // 초기 필터 적용 (서버에서 itemCode 필터로 진입한 경우)
+    if (document.getElementById('txSearch').value) filterTxTable();
+
+    /* ── 재고 조정 모달 ─────────────────────────── */
+    var adjustModalEl = document.getElementById('adjustModal');
+    var adjustModal   = new bootstrap.Modal(adjustModalEl);
+
+    var typeHints = {
+        '0': '(입고 수량 — 현재 재고에 더합니다)',
+        '1': '(출고 수량 — 현재 재고에서 뺍니다)',
+        '2': '(조정 후 절대 재고수량을 입력하세요)'
+    };
+    var typeHeaderClass = {
+        '0': 'bg-success text-white',
+        '1': 'bg-danger text-white',
+        '2': 'bg-warning text-dark'
+    };
+
+    function updateTypeUI() {
+        var v = document.getElementById('adjType').value;
+        document.getElementById('adjQtyHint').textContent = typeHints[v] || '';
+        var header = document.getElementById('adjustModalHeader');
+        header.className = 'modal-header ' + (typeHeaderClass[v] || 'bg-secondary text-white');
+        var adjHint = document.getElementById('adjAdjHint');
+        adjHint.classList.toggle('d-none', v !== '2');
+    }
+
+    document.getElementById('adjType').addEventListener('change', updateTypeUI);
+
+    // 품목 선택 시 현재재고/단위 채우기
+    document.getElementById('adjItemSelect').addEventListener('change', function () {
+        var opt = this.options[this.selectedIndex];
+        if (!opt || !opt.value) {
+            document.getElementById('adjCurrentStock').value = '';
+            document.getElementById('adjUnit').value = '';
+            document.getElementById('adjWarehouseCode').value = '';
+            return;
+        }
+        document.getElementById('adjCurrentStock').value =
+            parseFloat(opt.getAttribute('data-current-stock') || '0').toLocaleString('ko-KR');
+        document.getElementById('adjUnit').value = opt.getAttribute('data-unit') || '';
+        document.getElementById('adjWarehouseCode').value = opt.getAttribute('data-warehouse') || '';
+    });
+
+    // 헤더 버튼으로 모달 열기
+    document.getElementById('btnOpenAdjustModal').addEventListener('click', function () {
+        var form = document.getElementById('adjustForm');
+        form.classList.remove('was-validated');
+        document.getElementById('adjItemSelect').value = '';
+        document.getElementById('adjCurrentStock').value = '';
+        document.getElementById('adjUnit').value = '';
+        document.getElementById('adjWarehouseCode').value = '';
+        document.getElementById('adjType').value = '0';
+        document.getElementById('adjQuantity').value = '';
+        document.getElementById('adjReason').value = '';
+        document.getElementById('adjReference').value = '';
+        updateTypeUI();
+        adjustModal.show();
+    });
+
+    /* ── 저장 ────────────────────────────────────── */
+    document.getElementById('btnAdjSave').addEventListener('click', function () {
+        var form = document.getElementById('adjustForm');
+        form.classList.add('was-validated');
+        if (!form.checkValidity()) {
+            var first = form.querySelector(':invalid');
+            if (first) first.focus();
+            return;
+        }
+
+        var itemCode     = document.getElementById('adjItemSelect').value;
+        var warehouseCode = document.getElementById('adjWarehouseCode').value;
+        var txType       = parseInt(document.getElementById('adjType').value, 10);
+        var quantity     = parseFloat(document.getElementById('adjQuantity').value);
+        var reason       = document.getElementById('adjReason').value || null;
+        var reference    = document.getElementById('adjReference').value || null;
+
+        var payload = {
+            ItemCode:        itemCode,
+            WarehouseCode:   warehouseCode,
+            TransactionType: txType,
+            Quantity:        quantity,
+            Reason:          reason,
+            Reference:       reference
+        };
+
+        var btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>저장 중...';
+
+        msFetch('/api/inventory/adjust', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        })
+        .then(function (res) {
+            return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+        })
+        .then(function (result) {
+            adjustModal.hide();
+            if (result.ok && result.data.success !== false) {
+                showToast('재고 조정이 완료되었습니다.', 'success');
+                setTimeout(function () { location.reload(); }, 1200);
+            } else {
+                showToast(result.data.message || '처리 중 오류가 발생했습니다.', 'danger');
+            }
+        })
+        .catch(function (err) {
+            showToast('네트워크 오류가 발생했습니다.', 'danger');
+            console.error(err);
+        })
+        .finally(function () {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg me-1"></i><span id="btnAdjLabel">저장</span>';
+        });
+    });
+
+})();
+</script>
+}

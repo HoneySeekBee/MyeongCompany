@@ -24,20 +24,24 @@ public sealed class CreateInventoryTransactionHandler
         if (cmd.TransactionType == InventoryTransactionType.Issue && inv.CurrentStock < cmd.Quantity)
             throw new InvalidOperationException("Insufficient stock");
 
+        var stockBefore = inv.CurrentStock;
         inv.ApplyTransaction(cmd.TransactionType, cmd.Quantity);
         await _repo.UpdateAsync(inv, ct);
 
         var tx = new InventoryTransaction
         {
-            ItemCode = cmd.ItemCode,
-            WarehouseCode = cmd.WarehouseCode,
+            ItemCode        = cmd.ItemCode,
+            ItemName        = inv.ItemName,
+            WarehouseCode   = cmd.WarehouseCode,
             TransactionType = cmd.TransactionType,
-            Quantity = cmd.Quantity,
-            ReferenceNo = cmd.ReferenceNo,
-            Remarks = cmd.Remarks,
+            Quantity        = cmd.Quantity,
+            StockBefore     = stockBefore,
+            StockAfter      = inv.CurrentStock,
+            ReferenceNo     = cmd.ReferenceNo,
+            Remarks         = cmd.Remarks,
             TransactionDate = DateTime.UtcNow,
-            CreatedBy = cmd.CreatedBy,
-            CreatedAt = DateTime.UtcNow
+            CreatedBy       = cmd.CreatedBy,
+            CreatedAt       = DateTime.UtcNow
         };
         await _repo.AddTransactionAsync(tx, ct);
         return tx.TransactionId;

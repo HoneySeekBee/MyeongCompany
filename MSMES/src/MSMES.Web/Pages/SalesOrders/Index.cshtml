@@ -69,6 +69,38 @@
     </form>
 </div>
 
+<!-- 납기 KPI 카드 -->
+@{
+    var today = DateTime.Today;
+    var activeOrders = Model.Orders.Where(o => o.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped && o.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Closed).ToList();
+    int kpiOverdue = activeOrders.Count(o => o.DueDate < today);
+    int kpiDueSoon3 = activeOrders.Count(o => o.DueDate >= today && (o.DueDate - today).Days <= 3);
+    int kpiNormal = activeOrders.Count(o => o.DueDate > today.AddDays(3));
+}
+<div class="row g-3 mb-4">
+    <div class="col-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-danger border-start border-4">
+            <div class="text-danger small fw-semibold">납기 초과</div>
+            <div class="h2 fw-bold text-danger mb-0">@kpiOverdue</div>
+            <div class="text-muted small">건</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-warning border-start border-4">
+            <div class="text-warning small fw-semibold">긴급 (3일 이내)</div>
+            <div class="h2 fw-bold text-warning mb-0">@kpiDueSoon3</div>
+            <div class="text-muted small">건</div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="card border-0 shadow-sm text-center py-3 border-success border-start border-4">
+            <div class="text-success small fw-semibold">전체 미완료</div>
+            <div class="h2 fw-bold text-success mb-0">@(activeOrders.Count)</div>
+            <div class="text-muted small">건</div>
+        </div>
+    </div>
+</div>
+
 <!-- 테이블 카드 -->
 <div class="ms-card">
     <div class="ms-card__header">
@@ -139,17 +171,21 @@
                             <td>@s.OrderDate.ToString("yyyy-MM-dd")</td>
                             <td>
                                 @{
-                                    var isOverdue = s.DueDate < DateTime.Today &&
-                                                    s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped &&
-                                                    s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Closed;
+                                    var dueDays = (s.DueDate.Date - DateTime.Today).Days;
+                                    var isOverdue = dueDays < 0 && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Closed;
+                                    var isDueSoon = dueDays >= 0 && dueDays <= 7 && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Shipped && s.Status != MSMES.Domain.SalesOrder.SalesOrderStatus.Closed;
                                 }
                                 <span class="@(isOverdue ? "text-danger fw-600" : "")">
                                     @s.DueDate.ToString("yyyy-MM-dd")
-                                    @if (isOverdue)
-                                    {
-                                        <i class="bi bi-exclamation-circle-fill ms-1" title="납기 초과"></i>
-                                    }
                                 </span>
+                                @if (isOverdue)
+                                {
+                                    <span class="badge bg-danger ms-1">D+@(Math.Abs(dueDays))</span>
+                                }
+                                else if (isDueSoon)
+                                {
+                                    <span class="badge @(dueDays <= 3 ? "bg-danger" : "bg-warning text-dark") ms-1">D-@(dueDays)</span>
+                                }
                             </td>
                             <td class="text-end">
                                 @if (s.TotalAmount > 0)
@@ -176,6 +212,12 @@
                                             aria-label="삭제" title="삭제">
                                         <i class="bi bi-trash"></i>
                                     </button>
+                                    <button type="button" class="btn-icon"
+                                            onclick="openCreateWoFromSo('@s.SalesOrderNo', '@s.CustomerName', '@s.DueDate.ToString("yyyy-MM-dd")')"
+                                            title="작업지시 생성" aria-label="작업지시 생성"
+                                            style="color: var(--ms-info, #0dcaf0);">
+                                        <i class="bi bi-gear-fill"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -192,6 +234,97 @@
                 }
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════
+     수주 기반 작업지시 생성 모달
+════════════════════════════════════════════ -->
+<div class="modal fade" id="modalCreateWo" tabindex="-1"
+     aria-labelledby="modalCreateWoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalCreateWoLabel">
+                    <i class="bi bi-gear-fill me-2 text-primary-ms"></i>
+                    <span id="modalCreateWoTitle">작업지시 생성</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="닫기"></button>
+            </div>
+            <form id="formCreateWo" class="needs-validation" novalidate>
+                <div class="modal-body">
+                    <input type="hidden" id="woNo2" name="workOrderNo" />
+                    <input type="hidden" id="woFromSoNo" name="salesOrderNo" />
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">작업지시번호</label>
+                            <input type="text" id="woNo2Display" class="form-control" readonly
+                                   placeholder="자동 채번" />
+                            <div class="form-text text-muted-sm">자동으로 채번됩니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">수주번호 (연결)</label>
+                            <input type="text" id="woFromSoNoDisplay" class="form-control" readonly />
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woItemCode2" class="form-label">
+                                품목코드 <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" id="woItemCode2" name="itemCode"
+                                   class="form-control" placeholder="ITEM-001" required />
+                            <div class="invalid-feedback">품목코드는 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woItemName2" class="form-label">품목명</label>
+                            <input type="text" id="woItemName2" name="itemName"
+                                   class="form-control" placeholder="품목명" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woProcessCode2" class="form-label">공정코드</label>
+                            <input type="text" id="woProcessCode2" name="processCode"
+                                   class="form-control" placeholder="PROC-001" />
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woQty2" class="form-label">
+                                계획수량 <span class="text-danger">*</span>
+                            </label>
+                            <input type="number" id="woQty2" name="plannedQuantity"
+                                   class="form-control" placeholder="0" min="1" required />
+                            <div class="invalid-feedback">계획수량은 1 이상이어야 합니다.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="woStartDate2" class="form-label">
+                                시작일 <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="woStartDate2" name="startDate"
+                                   class="form-control" required />
+                            <div class="invalid-feedback">시작일은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="woEndDate2" class="form-label">
+                                완료예정일 (납기일 자동입력) <span class="text-danger">*</span>
+                            </label>
+                            <input type="date" id="woEndDate2" name="plannedEndDate"
+                                   class="form-control" required />
+                            <div class="invalid-feedback">완료예정일은 필수 입력입니다.</div>
+                        </div>
+                        <div class="col-12">
+                            <label for="woNote2" class="form-label">비고</label>
+                            <textarea id="woNote2" name="note" class="form-control" rows="2"
+                                      placeholder="특이사항을 입력하세요"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        취소
+                    </button>
+                    <button type="submit" class="btn btn-primary" aria-label="작업지시 생성">
+                        <i class="bi bi-gear-fill me-1"></i>작업지시 생성
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -345,6 +478,60 @@
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
+
+    // ── 수주 기반 작업지시 생성 모달 열기 ──
+    async function openCreateWoFromSo(soNo, customerName, dueDate) {
+        document.getElementById('formCreateWo').reset();
+        document.getElementById('formCreateWo').classList.remove('was-validated');
+        document.getElementById('woFromSoNo').value       = soNo;
+        document.getElementById('woFromSoNoDisplay').value = soNo;
+        document.getElementById('woEndDate2').value       = dueDate;
+        document.getElementById('woStartDate2').value     = new Date().toISOString().slice(0, 10);
+        document.getElementById('modalCreateWoTitle').textContent = '작업지시 생성 (' + soNo + ')';
+        document.getElementById('woNo2Display').value     = '채번 중...';
+
+        try {
+            var res  = await msFetch('/api/workorders/next-no');
+            var data = await res.json();
+            document.getElementById('woNo2').value        = data.workOrderNo;
+            document.getElementById('woNo2Display').value = data.workOrderNo;
+        } catch {
+            document.getElementById('woNo2').value        = '';
+            document.getElementById('woNo2Display').value = '';
+        }
+
+        new bootstrap.Modal(document.getElementById('modalCreateWo')).show();
+    }
+
+    document.getElementById('formCreateWo').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!this.checkValidity()) {
+            this.classList.add('was-validated');
+            var firstInvalid = this.querySelector(':invalid');
+            if (firstInvalid) firstInvalid.focus();
+            return;
+        }
+        var formData = new FormData(this);
+        var data = Object.fromEntries(formData.entries());
+        // plannedQuantity는 숫자로 변환
+        data.plannedQuantity = parseFloat(data.plannedQuantity) || 0;
+        // workOrderNo가 빈 경우 null로 처리하여 자동 채번
+        if (!data.workOrderNo) data.workOrderNo = null;
+
+        try {
+            var res = await msFetch('/api/workorders', { method: 'POST', body: JSON.stringify(data) });
+            if (res.ok || res.status === 201) {
+                bootstrap.Modal.getInstance(document.getElementById('modalCreateWo')).hide();
+                showToast('작업지시가 생성되었습니다. /WorkOrders에서 확인하세요.', 'success');
+            } else {
+                var err = await res.json().catch(function() { return {}; });
+                showToast('생성 실패: ' + (err.message || '알 수 없는 오류'), 'danger');
+            }
+        } catch {
+            showToast('생성 실패: 네트워크 오류', 'danger');
+        }
+    });
 
     // ── 등록 모달 열기 ──
     async function openCreateModal() {

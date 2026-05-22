@@ -3,6 +3,27 @@
  * Bootstrap 5.3 + Chart.js 기반
  */
 
+/* ── 다크모드 (깜빡임 방지: DOMContentLoaded 이전 실행) ── */
+(function() {
+    var savedTheme = localStorage.getItem('msTheme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    window.toggleDarkMode = function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('msTheme', next);
+        var icon = document.getElementById('darkModeIcon');
+        if (icon) icon.className = next === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+    };
+
+    document.addEventListener('DOMContentLoaded', function() {
+        var icon = document.getElementById('darkModeIcon');
+        var theme = localStorage.getItem('msTheme') || 'light';
+        if (icon) icon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon';
+    });
+})();
+
 /* ── 사이드바 토글 (모바일) ─────────────────────────── */
 (function initSidebarToggle() {
     const sidebar  = document.getElementById('msSidebar');
@@ -76,8 +97,10 @@
 })();
 
 /* ── Toast 알림 ─────────────────────────────────────── */
-function showToast(message, type) {
-    type = type || 'success';
+function showToast(message, type, duration) {
+    type     = type     || 'info';
+    duration = duration || 4000;
+
     var container = document.getElementById('ms-toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -93,19 +116,17 @@ function showToast(message, type) {
     };
 
     var toast = document.createElement('div');
-    toast.className = 'ms-toast toast-' + type;
+    toast.className = 'ms-toast ' + type;
     toast.innerHTML =
         '<i class="bi ' + (iconMap[type] || 'bi-info-circle-fill') + '"></i>' +
         '<span>' + message + '</span>';
 
     container.appendChild(toast);
 
-    setTimeout(function () {
-        toast.style.animation = 'ms-toast-in 0.2s ease reverse';
-        toast.addEventListener('animationend', function () {
-            toast.remove();
-        });
-    }, 4000);
+    setTimeout(function() {
+        toast.style.animation = 'ms-toast-out 0.3s ease forwards';
+        setTimeout(function() { toast.remove(); }, 300);
+    }, duration);
 }
 
 /* ── 삭제 확인 모달 ─────────────────────────────────── */
@@ -387,7 +408,7 @@ function loadDashboardData() {
     });
 })();
 
-/* ── 모달 Esc 닫기 / Enter 저장 ─────────────────────── */
+/* ── 모달 Esc 닫기 / Enter 저장 / Ctrl+K 검색 포커스 ── */
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         var openModal = document.querySelector('.modal.show');
@@ -403,6 +424,46 @@ document.addEventListener('keydown', function(e) {
             if (saveBtn) saveBtn.click();
         }
     }
+    // Ctrl+K: 검색 필드 포커스
+    if (e.ctrlKey && e.key === 'k') {
+        e.preventDefault();
+        var searchInput = document.querySelector('input[type="search"], input[type="text"][name*="search"], input[id*="filter"], input[id*="search"]');
+        if (searchInput) searchInput.focus();
+    }
+});
+
+/* ── 페이지 로딩 프로그레스바 ────────────────────────── */
+(function() {
+    var loader = document.createElement('div');
+    loader.id = 'ms-page-loader';
+    document.addEventListener('DOMContentLoaded', function() {
+        document.body.prepend(loader);
+
+        document.querySelectorAll('a:not([target="_blank"]):not([href^="#"]):not([href^="javascript"])').forEach(function(a) {
+            a.addEventListener('click', function() {
+                loader.style.width   = '60%';
+                loader.style.opacity = '1';
+            });
+        });
+    });
+
+    window.addEventListener('load', function() {
+        loader.style.width = '100%';
+        setTimeout(function() {
+            loader.style.opacity = '0';
+            loader.style.width   = '0';
+        }, 300);
+    });
+})();
+
+/* ── 숫자 천단위 콤마 자동 포맷 ─────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[data-format="number"]').forEach(function(input) {
+        input.addEventListener('input', function() {
+            var raw = this.value.replace(/[^0-9]/g, '');
+            this.value = raw ? parseInt(raw, 10).toLocaleString('ko-KR') : '';
+        });
+    });
 });
 
 /* ── 대시보드 페이지 자동 실행 ───────────────────────── */

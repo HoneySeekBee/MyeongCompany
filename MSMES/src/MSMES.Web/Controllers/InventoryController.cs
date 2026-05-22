@@ -81,4 +81,58 @@ public class InventoryController : ControllerBase
             return BadRequest(new { Success = false, Message = ex.Message });
         }
     }
+
+    /// <summary>트랜잭션 목록 (페이징)</summary>
+    [HttpGet("transactions")]
+    public async Task<IActionResult> Transactions(
+        [FromQuery] string? itemCode,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100,
+        CancellationToken ct = default)
+    {
+        var list = await _repo.ListTransactionsAsync(itemCode, skip, take, ct);
+        return Ok(list);
+    }
+
+    /// <summary>재고 조정 (입고/출고/조정 통합 — StockBefore/After 자동 추적)</summary>
+    [HttpPost("adjust")]
+    public async Task<IActionResult> Adjust(
+        [FromBody] AdjustStockRequest req,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(req.ItemCode))
+            return BadRequest(new { Success = false, Message = "품목코드를 입력하세요." });
+        if (string.IsNullOrWhiteSpace(req.WarehouseCode))
+            return BadRequest(new { Success = false, Message = "창고코드를 입력하세요." });
+        if (req.Quantity <= 0)
+            return BadRequest(new { Success = false, Message = "수량은 0보다 커야 합니다." });
+
+        try
+        {
+            var createdBy = User.FindFirst("UserName")?.Value
+                         ?? User.Identity?.Name
+                         ?? "Unknown";
+
+            await _repo.AdjustStockAsync(
+                req.ItemCode, req.WarehouseCode,
+                req.Quantity, req.TransactionType,
+                req.Reason ?? string.Empty,
+                req.Reference,
+                createdBy, ct);
+
+            return Ok(new { Success = true });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { Success = false, Message = ex.Message });
+        }
+    }
 }
+
+public sealed record AdjustStockRequest(
+    string ItemCode,
+    string WarehouseCode,
+    MSMES.Domain.Inventory.InventoryTransactionType TransactionType,
+    decimal Quantity,
+    string? Reason,
+    string? Reference);

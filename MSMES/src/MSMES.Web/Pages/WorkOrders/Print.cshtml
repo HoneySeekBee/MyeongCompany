@@ -1,0 +1,115 @@
+@page "{no}"
+@model MSMES.Web.Pages.WorkOrders.PrintModel
+@{
+    Layout = "_PrintLayout";
+    var wo = Model.WorkOrder!;
+    var printedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+}
+
+<!-- 인쇄/닫기 버튼 -->
+<div class="no-print">
+    <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+        <i class="bi bi-printer me-1"></i>인쇄
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="window.close()">
+        닫기
+    </button>
+</div>
+
+<!-- 문서 헤더 -->
+<div class="print-header d-flex justify-content-between align-items-end">
+    <div>
+        <div class="company-name">MSMES</div>
+        <div class="company-sub">Manufacturing Execution System</div>
+    </div>
+    <div class="doc-title">작&nbsp;&nbsp;업&nbsp;&nbsp;지&nbsp;&nbsp;시&nbsp;&nbsp;서</div>
+    <div style="width:160px;"></div>
+</div>
+
+<!-- 기본 정보 -->
+<table class="info-table">
+    <tr>
+        <td class="label">작업지시번호</td>
+        <td>@wo.WorkOrderNo</td>
+        <td class="label">수주참조번호</td>
+        <td>@(wo.SalesOrderNo ?? "—")</td>
+    </tr>
+    <tr>
+        <td class="label">품목코드</td>
+        <td>@wo.ItemCode</td>
+        <td class="label">품목명</td>
+        <td>@wo.ItemName</td>
+    </tr>
+    <tr>
+        <td class="label">공정코드</td>
+        <td>@(wo.ProcessCode ?? "—")</td>
+        <td class="label">상태</td>
+        <td>@wo.StatusName</td>
+    </tr>
+    <tr>
+        <td class="label">계획수량</td>
+        <td>@(wo.PlannedQuantity.ToString("N0")) EA</td>
+        <td class="label">실적수량</td>
+        <td>@(wo.ProducedQuantity.ToString("N0")) EA</td>
+    </tr>
+    <tr>
+        <td class="label">시작일</td>
+        <td>@wo.StartDate.ToString("yyyy-MM-dd")</td>
+        <td class="label">완료예정일</td>
+        <td>@wo.PlannedEndDate.ToString("yyyy-MM-dd")</td>
+    </tr>
+    <tr>
+        <td class="label">비고</td>
+        <td colspan="3">@(wo.Note ?? "—")</td>
+    </tr>
+</table>
+
+<!-- 공정 진행 현황 -->
+<div style="font-weight:700; margin-bottom:8px;">공정 진행 현황</div>
+<table class="items-table">
+    <thead>
+        <tr>
+            <th>공정</th>
+            <th>계획수량</th>
+            <th>실적수량</th>
+            <th>달성률</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr class="total-row">
+            <td>전체</td>
+            <td>@wo.PlannedQuantity.ToString("N0")</td>
+            <td>@wo.ProducedQuantity.ToString("N0")</td>
+            <td>@(wo.ProgressRate.ToString("F1"))%</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- 서명란 -->
+<div class="sign-area">
+    <div class="sign-box">
+        <div class="sign-label">작성</div>
+        <div class="sign-space"></div>
+    </div>
+    <div class="sign-box">
+        <div class="sign-label">검토</div>
+        <div class="sign-space"></div>
+    </div>
+    <div class="sign-box">
+        <div class="sign-label">승인</div>
+        <div class="sign-space"></div>
+    </div>
+    <div class="sign-box">
+        <div class="sign-label">현장확인</div>
+        <div class="sign-space"></div>
+    </div>
+</div>
+
+<!-- 출력 일시 -->
+<div class="print-footer">
+    출력일시: @printedAt
+</div>
+
+@section Scripts {
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+}

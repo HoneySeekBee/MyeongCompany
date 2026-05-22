@@ -76,8 +76,10 @@ public sealed class SqlInventoryRepository : IInventoryRepository
     {
         using var conn = _factory.Create();
         const string sql = @"INSERT INTO dbo.InventoryTransactions
-            (ItemCode, WarehouseCode, TransactionType, Quantity, ReferenceNo, Remarks, TransactionDate, CreatedBy, CreatedAt)
-            VALUES (@ItemCode, @WarehouseCode, @TransactionType, @Quantity, @ReferenceNo, @Remarks, @TransactionDate, @CreatedBy, @CreatedAt);
+            (ItemCode, ItemName, WarehouseCode, TransactionType, Quantity, StockBefore, StockAfter,
+             ReferenceNo, Remarks, TransactionDate, CreatedBy, CreatedAt)
+            VALUES (@ItemCode, @ItemName, @WarehouseCode, @TransactionType, @Quantity, @StockBefore, @StockAfter,
+                    @ReferenceNo, @Remarks, @TransactionDate, @CreatedBy, @CreatedAt);
             SELECT CAST(SCOPE_IDENTITY() AS BIGINT)";
         var id = await conn.ExecuteScalarAsync<long>(new CommandDefinition(sql, tx, cancellationToken: ct));
         tx.TransactionId = id;
@@ -112,6 +114,119 @@ public sealed class SqlInventoryRepository : IInventoryRepository
         var rows = await conn.QueryAsync<InventoryTransaction>(
             new CommandDefinition(sql, new { count }, cancellationToken: ct));
         return rows.ToList();
+    }
+
+    public async Task<IReadOnlyList<InventoryTransaction>> ListTransactionsAsync(
+        string? itemCode, int skip, int take, CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        const string sql = @"
+            SELECT t.*
+            FROM dbo.InventoryTransactions t
+            WHERE (@itemCode IS NULL OR t.ItemCode = @itemCode)
+            ORDER BY t.TransactionDate DESC
+            OFFSET @skip ROWS FETCH NEXT @take ROWS ONLY";
+        var rows = await conn.QueryAsync<InventoryTransaction>(
+            new CommandDefinition(sql, new { itemCode, skip, take }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
+    public async Task AdjustStockAsync(
+        string itemCode, string warehouseCode,
+        decimal delta, InventoryTransactionType txType,
+        string reason, string? reference, string createdBy,
+        CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        conn.Open();
+        using var tran = conn.BeginTransaction();
+        try
+        {
+            // 1. 현재 재고 조회 (StockBefore)
+            var inv = await conn.QuerySingleOrDefaultAsync<Inventory>(
+                new CommandDefinition(
+                    "SELECT * FROM dbo.Inventories WHERE ItemCode = @itemCode AND WarehouseCode = @warehouseCode",
+                    new { itemCode, warehouseCode },
+                    transaction: tran,
+                    cancellationToken: ct))
+                ?? throw new InvalidOperationException($"재고를 찾을 수 없습니다: {itemCode}/{warehouseCode}");
+
+            var stockBefore = inv.CurrentStock;
+
+            // 2. 새 재고 계산
+            decimal stockAfter = txType switch
+            {
+                InventoryTransactionType.Receipt    => stockBefore + delta,
+                InventoryTransactionType.Issue      => stockBefore - delta,
+                InventoryTransactionType.Adjustment => delta,   // Adjustment: delta = 절대값
+                _                                   => stockBefore + delta
+            };
+
+            if (txType == InventoryTransactionType.Issue && stockAfter < 0)
+                throw new InvalidOperationException($"재고가 부족합니다. 현재재고: {stockBefore:N2}, 출고요청: {delta:N2}");
+
+            // 3. Inventories 업데이트
+            await conn.ExecuteAsync(
+                new CommandDefinition(
+                    "UPDATE dbo.Inventories SET CurrentStock = @stockAfter, UpdatedAt = SYSUTCDATETIME() WHERE ItemCode = @itemCode AND WarehouseCode = @warehouseCode",
+                    new { stockAfter, itemCode, warehouseCode },
+                    transaction: tran,
+                    cancellationToken: ct));
+
+            // 4. 실제 변화량 계산 (Adjustment의 경우 diff 기록)
+            var actualDelta = txType == InventoryTransactionType.Adjustment
+                ? stockAfter - stockBefore
+                : (txType == InventoryTransactionType.Issue ? delta : delta);
+
+            // 5. InventoryTransactions INSERT
+            await conn.ExecuteAsync(
+                new CommandDefinition(
+                    @"INSERT INTO dbo.InventoryTransactions
+                        (ItemCode, ItemName, WarehouseCode, TransactionType, Quantity,
+                         StockBefore, StockAfter, ReferenceNo, Remarks,
+                         TransactionDate, CreatedBy, CreatedAt)
+                      VALUES
+                        (@itemCode, @itemName, @warehouseCode, @txType, @actualDelta,
+                         @stockBefore, @stockAfter, @reference, @reason,
+                         SYSUTCDATETIME(), @createdBy, SYSUTCDATETIME())",
+                    new
+                    {
+                        itemCode,
+                        itemName = inv.ItemName,
+                        warehouseCode,
+                        txType = (int)txType,
+                        actualDelta,
+                        stockBefore,
+                        stockAfter,
+                        reference,
+                        reason,
+                        createdBy
+                    },
+                    transaction: tran,
+                    cancellationToken: ct));
+
+            tran.Commit();
+        }
+        catch
+        {
+            tran.Rollback();
+            throw;
+        }
+    }
+
+    public async Task<(int TodayIn, int TodayOut, int TodayAdj)> GetTodayTransactionCountsAsync(CancellationToken ct = default)
+    {
+        using var conn = _factory.Create();
+        const string sql = @"
+            SELECT
+                SUM(CASE WHEN TransactionType = 0 THEN 1 ELSE 0 END) AS TodayIn,
+                SUM(CASE WHEN TransactionType = 1 THEN 1 ELSE 0 END) AS TodayOut,
+                SUM(CASE WHEN TransactionType = 2 THEN 1 ELSE 0 END) AS TodayAdj
+            FROM dbo.InventoryTransactions
+            WHERE CAST(TransactionDate AS DATE) = CAST(SYSUTCDATETIME() AS DATE)";
+        var row = await conn.QuerySingleAsync<(int TodayIn, int TodayOut, int TodayAdj)>(
+            new CommandDefinition(sql, cancellationToken: ct));
+        return row;
     }
 
     public async Task<(int Normal, int Low, int Out)> GetStatusSummaryAsync(CancellationToken ct = default)

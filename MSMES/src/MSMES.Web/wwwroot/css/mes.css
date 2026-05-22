@@ -480,42 +480,7 @@ html, body {
     transition: width 0.4s ease;
 }
 
-/* ── Toast 영역 ────────────────────────────────────────── */
-#ms-toast-container {
-    position: fixed;
-    top: 70px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: none;
-}
-
-.ms-toast {
-    pointer-events: all;
-    min-width: 280px;
-    max-width: 380px;
-    padding: 12px 16px;
-    border-radius: 6px;
-    color: #fff;
-    font-size: 13px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    animation: ms-toast-in 0.25s ease;
-}
-
-.ms-toast.toast-success { background: var(--ms-success); }
-.ms-toast.toast-danger  { background: var(--ms-danger); }
-.ms-toast.toast-warning { background: var(--ms-warning); color: #212529; }
-.ms-toast.toast-info    { background: var(--ms-info); }
-
-@keyframes ms-toast-in {
-    from { opacity: 0; transform: translateX(20px); }
-    to   { opacity: 1; transform: translateX(0); }
-}
+/* ── Toast 영역 (하단 정의에서 통합 관리) ─────────────── */
 
 /* ── 차트 컨테이너 ────────────────────────────────────── */
 .chart-container {
@@ -677,4 +642,261 @@ html, body {
 @keyframes skeleton-loading {
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+}
+
+/* ── 다크모드 ──────────────────────────────────────────── */
+[data-theme="dark"] {
+    --ms-bg:      #0d1117;
+    --ms-card:    #161b22;
+    --ms-text:    #e6edf3;
+    --ms-muted:   #8b949e;
+    --ms-border:  #30363d;
+    --ms-dark:    #21262d;
+    --ms-dark-2:  #30363d;
+}
+
+[data-theme="dark"] body {
+    background-color: var(--ms-bg);
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .ms-sidebar {
+    background: #161b22;
+    border-right: 1px solid #30363d;
+}
+
+[data-theme="dark"] .ms-header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+}
+
+[data-theme="dark"] .ms-card,
+[data-theme="dark"] .card {
+    background: #161b22;
+    border-color: #30363d;
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .ms-card__header {
+    border-bottom-color: #30363d;
+}
+
+[data-theme="dark"] .ms-filter-card {
+    background: #161b22;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .kpi-card {
+    background: #161b22;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .mes-table thead th {
+    background: #21262d;
+    color: #8b949e;
+    border-bottom-color: #30363d;
+}
+
+[data-theme="dark"] .mes-table tbody td {
+    border-bottom-color: #30363d;
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .mes-table tbody tr:hover td {
+    background: #1c2128;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+    background: #0d1117;
+    color: #e6edf3;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus {
+    background: #0d1117;
+    color: #e6edf3;
+    border-color: var(--ms-primary);
+}
+
+[data-theme="dark"] .modal-content {
+    background: #161b22;
+    color: #e6edf3;
+}
+
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .dropdown-menu {
+    background: #161b22;
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .dropdown-item {
+    color: #e6edf3;
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+    background: #21262d;
+    color: #fff;
+}
+
+[data-theme="dark"] .dropdown-divider {
+    border-color: #30363d;
+}
+
+[data-theme="dark"] .btn-light {
+    background: #21262d;
+    border-color: #30363d;
+    color: #e6edf3;
+}
+
+[data-theme="dark"] .btn-icon {
+    background: #21262d;
+    border-color: #30363d;
+    color: #8b949e;
+}
+
+[data-theme="dark"] .btn-icon:hover {
+    background: #30363d;
+    color: #e6edf3;
+}
+
+[data-theme="dark"] .ms-header__title {
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .ms-header__user {
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .text-muted,
+[data-theme="dark"] .ms-muted {
+    color: #8b949e !important;
+}
+
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-bottom,
+[data-theme="dark"] .border-top {
+    border-color: #30363d !important;
+}
+
+[data-theme="dark"] .table {
+    color: var(--ms-text);
+}
+
+[data-theme="dark"] .ms-progress {
+    background-color: #30363d;
+}
+
+[data-theme="dark"] .skeleton {
+    background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%);
+    background-size: 200% 100%;
+}
+
+/* ── 헤더 sticky 강화 ──────────────────────────────────── */
+.ms-header {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+/* ── 페이지 로딩 프로그레스바 ──────────────────────────── */
+#ms-page-loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: var(--ms-primary);
+    z-index: 9999;
+    transition: width 0.3s ease, opacity 0.3s ease;
+    pointer-events: none;
+}
+
+/* ── Empty State ───────────────────────────────────────── */
+.ms-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--ms-muted);
+}
+
+.ms-empty-state__icon {
+    font-size: 48px;
+    opacity: 0.3;
+    display: block;
+    margin-bottom: 16px;
+}
+
+.ms-empty-state__title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.ms-empty-state__sub {
+    font-size: 0.85rem;
+    opacity: 0.7;
+}
+
+/* ── Toast 개선 ────────────────────────────────────────── */
+#ms-toast-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    top: auto;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+}
+
+.ms-toast {
+    background: #1e2a3a;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: ms-toast-in 0.3s ease;
+    pointer-events: auto;
+    max-width: 360px;
+    min-width: 240px;
+}
+
+.ms-toast.success { border-left: 4px solid #28a745; }
+.ms-toast.danger  { border-left: 4px solid #dc3545; }
+.ms-toast.warning { border-left: 4px solid #ffc107; }
+.ms-toast.info    { border-left: 4px solid #17a2b8; }
+
+/* 구버전 클래스명 호환 */
+.ms-toast.toast-success { border-left: 4px solid #28a745; }
+.ms-toast.toast-danger  { border-left: 4px solid #dc3545; }
+.ms-toast.toast-warning { border-left: 4px solid #ffc107; }
+.ms-toast.toast-info    { border-left: 4px solid #17a2b8; }
+
+@keyframes ms-toast-in {
+    from { transform: translateX(110%); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes ms-toast-out {
+    from { transform: translateX(0);    opacity: 1; }
+    to   { transform: translateX(110%); opacity: 0; }
+}
+
+/* ── 테이블 행 호버 액션 버튼 fade-in ─────────────────── */
+.mes-table tbody tr .row-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.mes-table tbody tr:hover .row-actions {
+    opacity: 1;
 }

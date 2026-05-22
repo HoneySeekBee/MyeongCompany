@@ -176,6 +176,10 @@
                         <i class="bi bi-box-seam"></i>
                         <span class="ms-sidebar__link-text">재고관리</span>
                     </a>
+                    <a href="/Inventory/Transactions" class="ms-sidebar__link" aria-label="입출고 이력">
+                        <i class="bi bi-arrow-left-right"></i>
+                        <span class="ms-sidebar__link-text">입출고 이력</span>
+                    </a>
                 }
                 @if (isAdmin || isManager || isSales || isWarehouse)
                 {
@@ -284,6 +288,11 @@
                     <span id="alert-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
                           style="font-size:9px;"></span>
                 </a>
+
+                <!-- 다크모드 토글 -->
+                <button class="btn btn-sm btn-light" onclick="toggleDarkMode()" title="다크모드 전환" id="darkModeBtn" aria-label="다크모드 전환">
+                    <i class="bi bi-moon" id="darkModeIcon"></i>
+                </button>
 
                 <!-- 사용자 정보 + Role 뱃지 (드롭다운) -->
                 <div class="dropdown">

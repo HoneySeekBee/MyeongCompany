@@ -787,6 +787,7 @@
                 '<td style="text-align:center;white-space:nowrap;" onclick="event.stopPropagation();">' +
                     '<button class="btn btn-outline-primary btn-sm py-0 px-1 me-1" onclick="openPoDetail(\'' + po.purchaseOrderNo + '\')" title="상세"><i class="bi bi-eye"></i></button>' +
                     quickBtn + editBtn + delBtn +
+                    '<a href="/PurchaseOrders/Print/' + encodeURIComponent(po.purchaseOrderNo) + '" target="_blank" class="btn btn-outline-secondary btn-sm py-0 px-1 ms-1" title="인쇄"><i class="bi bi-printer"></i></a>' +
                 '</td>' +
             '</tr>';
         });
